@@ -22,13 +22,13 @@ Therefore, it is recommended to use the following commands during operation and 
 
 1. To support first set of basic commands (listed below) to debug edge (node) components in different VM's or hosts.
 
-
-
 For edge, commands shall be:
 
-- `keadm debug diagnose`
-- `keadm debug collect`
-- `keadm debug check`
+- `keadm help`
+  - `keadm debug diagnose`
+  - `keadm debug collect`
+  - `keadm debug check`
+  - `keadm debug get`
 
 # Scope of commands
 
@@ -36,7 +36,29 @@ For edge, commands shall be:
 
 **NOTE**: All the below steps are executed as root user, to execute as sudo user. Please add `sudo` infront of all the commands.
 
-### keadm diagnose --help
+### keadm debug  --help
+
+```
+keadm help command provide debug function to help diagnose the cluster.
+
+Usage:
+  keadm debug [command]
+
+Examples:
+
+Available Commands:
+  diagnose        diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
+  collect         Obtain all data of the current node, and then locate and use operation personnel.
+  check           check whether the system specific items meet the requirements of edgecore installation and operation.
+  get             This command will be responsible to get and format the data in the edge-site database edgecore.db (such as kubectl get)
+
+Flags:
+  -h, --help   help for keadm debug
+```
+
+### 
+
+### keadm debug diagnose --help
 
 ```
 keadm diagnose command can be help to diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
@@ -57,7 +79,7 @@ Available Commands:
 
 ```
 
-### keadm check --help
+### keadm debug check --help
 
 ```
 keadm check command can be check whether the system specific items meet the requirements of edgecore installation and operation.
@@ -72,19 +94,15 @@ Available Commands:
   memory   Check the system memory size and the amount of memory left
   disk     Check whether the disk meets the requirements
   dns      Check whether the node domain name resolution function is normal
-  runtime  Check whether the node Container runtime is normal
-  network  Check whether the node can communicate with the endpoint on the cloud
+  runtime  Check whether the node Container runtime is normal, can use parameter `--runtime` to set container runtime,  default is docker
+  network  Check whether the node can communicate with the endpoint on the cloud,can use parameter `--ip` to set test ip, default to ping clusterdns
   pid      Check if the current number of processes in the environment is too many. If the number of available processes is less than 5%, the number of processes is considered insufficient
   
 Flags:
-  -h, --help   help for keadm check
-
-Use "keadm debug check [command] --help" for more information about a command
+  -h, --help   help for keadm debug check
 ```
 
-
-
-### keadm collect --help
+### keadm debug collect --help
 
 ```
 Obtain all data of the current node, and then locate and use operation personnel.
@@ -100,7 +118,11 @@ Flags:
   --path    Cache data and store data compression packages in a directory that defaults to the current directory
   --detail  Whether to print internal log output
 
+Flags:
+  -h, --help   help for keadm debug collect
 ```
+
+
 
 ## Explaining the commands
 
@@ -140,10 +162,10 @@ Flags:
   
    - x86_64 architecture
        Ubuntu 16.04 LTS (Xenial Xerus), Ubuntu 18.04 LTS (Bionic Beaver), CentOS 7.x and RHEL 7.x, Galaxy Kylin 4.0.2, ZTE new fulcrum v5.5, winning the bid Kylin v7.0
-  
+    
    - armv7i (arm32) architecture
        Raspbian GNU/Linux 9 (stretch)
-  
+    
    - aarch64 (arm64) architecture
        Ubuntu 18.04.2 LTS (Bionic Beaver)
   3. Use command `cpu` can cetermine if the NUMBER of CPU cores meets the requirement, minimum 1Vcores.
