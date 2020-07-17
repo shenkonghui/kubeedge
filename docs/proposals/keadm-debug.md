@@ -15,6 +15,16 @@ last-updated:  2020-07-16
 Many users shared their feedback that kubeEdge edge nodes do not have good debugging and diagnostic methods, which may prevent people from trying kubeEdge.
 There should be a simple and clear way to help operation and maintenance personnel to ensure the stable operation of kubeEdge, so that users can focus more on using it immediately.
 
+#### Goal
+
+- Alpha
+
+Collect the full amount of information related to kubeedge in the current environment, and provide it to O&M personnel to locate and solve difficult problems.
+- Beta
+
+1. Diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
+2. Check whether the system specific items meet the requirements of edgecore installation and operation.
+
 # Proposal
 
 KubeEdge should have simple commands to debug and troubleshoot edge components.
@@ -50,7 +60,7 @@ Examples:
 
 Available Commands:
   diagnose        Diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
-  collect         Obtain all data of the current node, and then locate and use operation personnel.
+  collect         Obtain all the data of the current node, and provide it to the operation and maintenance personnel to locate the problem.
   check           Check whether the system specific items meet the requirements of edgecore installation and operation.
   get             Get and format data of available resource types in the local database of the edge node.
 
@@ -76,7 +86,7 @@ Available Commands:
   all           All resource
   node          Troubleshoot the cause of edge node failure with installed software
   pod           Troubleshooting specific container application instances on nodes
-  installation  It is same as "keadm check all"
+  installation  It is same as "keadm debug check all"
 
 ```
 
@@ -90,7 +100,7 @@ Usage:
 
 Available Commands:
   all      Check all
-  arch     Determine the node hardware architecture whether support or not
+  arch     Determine the node hardware architecture whether support or not. arch support amd64,arm64v8,arm32v7,i386 and s390x. qemu_arch support x86_64,aarch64,arm,i386 and s390x
   cpu      Determine if the NUMBER of CPU cores meets the requirement
   memory   Check the system memory size and the amount of memory left
   disk     Check whether the disk meets the requirements
@@ -107,7 +117,7 @@ Flags:
 ### keadm debug collect --help
 
 ```
-Obtain all data of the current node, and then locate and use operation personnel.
+Obtain all the data of the current node, and then give it to the operation and maintenance personnel to locate the problem.
 
 Usage:
   keadm debug collect [flags]
@@ -117,9 +127,9 @@ Examples:
 keadm debug collect --path . 
 
 Flags:
-  --config  Specify configuration file, defalut is /etc/kubeedge/config/edgecore.yaml
-  --path    Cache data and store data compression packages in a directory that defaults to the current directory
-  --detail  Whether to print internal log output
+  --config       Specify configuration file, defalut is /etc/kubeedge/config/edgecore.yaml
+  --output-path  Cache data and store data compression packages in a directory that defaults to the current directory
+  --detail       Whether to print internal log output
 
 Flags:
   -h, --help   help for keadm debug collect
@@ -149,6 +159,7 @@ keadm debug get configmap web -n default
 keadm debug get configmap web -n default -o yaml
 
 Available resource:
+  all
   pod
   node
   service
@@ -177,51 +188,47 @@ Flags:
   
 - What shall be its scope ?
     1. Use command `all` can diagnose all resource
+
     2. Use command `node` can troubleshoot the cause of edge node failure with installed software
        1. check system resources is enough
        2. check container runtime is running 
        3. check all edgecore components are running
        4. check cloudercore can be connected
+       
     3. Use command `pod` can troubleshooting specific container application instances on nodes
-       1. check pod Is the configuration correct 
-       2. check pod  image can be right pull
-       3. check pod schedule 
-       4. check pod probe
-       5. many more
-    4. Use command `installation` is same as "keadm check all"
+       1. check pod probe
+       2. check pod storage
+       3. check pod network
+       4. other more
+
+    4. Use command `installation` is same as "keadm debug check all"
+
+       
 
 `keadm debug check`
 
 - What is it?
   
   - This command will be check whether the system specific items meet the requirements of edgecore installation and operation.
-  
 - What shall be its scope ?
 
   1. Check items include hardware resources or operating system resources (cpu, memory, disk, network, pid limit,etc.)
   2. Use command `arch` can check node hardware architecture:
-  
-   - x86_64 architecture
-       Ubuntu 16.04 LTS (Xenial Xerus), Ubuntu 18.04 LTS (Bionic Beaver), CentOS 7.x and RHEL 7.x, Galaxy Kylin 4.0.2, ZTE new fulcrum v5.5, winning the bid Kylin v7.0
-    
-   - armv7i (arm32) architecture
-       Raspbian GNU/Linux 9 (stretch)
-    
-   - aarch64 (arm64) architecture
-       Ubuntu 18.04.2 LTS (Bionic Beaver)
+     - arch: amd64,arm64v8,arm32v7,i386 and s390x
+     - qemu_arch: x86_64,aarch64,arm,i386 and s390x
   3. Use command `cpu` can determine if the NUMBER of CPU cores meets the requirement, minimum 1Vcores.
   4. Use command `memory` check the system memory size, and the amount of memory left, requirements minimum 256MB.
   5. Use command `disk` check whether the disk meets the requirements, requirements minimum 1 GB.
-  6. Use command `dns` Check whether the node domain name resolution function is normal.
-  7. Use command `runtime `  Check whether the node container runtime function is installed, can use parameter `--runtime` to set container runtime,  default is docker
-  8. Use command `network `  check whether the node can communicate with the endpoint on the cloud,    can use parameter `--ip` to set test ip, default to ping clusterdns.
+  6. Use command `dns` Check whether the node domain name resolution  is normal.
+  7. Use command `runtime `  Check whether the node container runtime  is installed, can use parameter `--runtime` to set container runtime,  default is docker
+  8. Use command `network `  check whether the node can communicate with the endpoint on the cloud,    can use parameter `--ip` to set test ip, default to ping cloudcore.
   9. Use command `pid ` check if the current number of processes in the environment is too many. If the number of available processes is less than 5%, the number of processes is considered insufficient.
 
 `keadm debug collect`
 
 - What is it?
 
-  - This command will obtain all related data of the current node, and then locate and use  operation personnel.
+  - This command will obtain all the data of the current node as  `edge-$date.tar.gz`, and provide it to the operation and maintenance personnel to locate the problem.
 
 - What shall be its scope ?
 
@@ -279,7 +286,7 @@ Flags:
 
     Copy all files under /etc/kubeedge/certs/
 
-  - Edge-Core configuration file in  software (including Edge-daemon)
+  - Edge-Core configuration file in  software
 
     Copy all files under /etc/kubeedge/config/
 
@@ -306,6 +313,7 @@ Flags:
 - What shall be its scope ?
 
   1. Format resource information from the local database, and available resource types:
+    - `all`
     - `pod`
     - `node`
     - `service`
@@ -313,5 +321,6 @@ Flags:
     - `configmap`
     - `endpoint`
   2. Use flag `-n, --namespace=''` to indicate the scope of resource acquisition, if the flag `-A, --all-namespaces` is used, information of the specified resource will be obtained from all ranges
-  3. Use flag `-o, --output=''` to indicate output format of the information 
+  3. Use flag `-o, --output=''` to indicate output format of the information . support formats `yaml`,`json` and `wide`.
   4. Use flag `-l` to indicate which specified field is used to filter the data in the range
+  5. Use flag `-db, --db-path''` to specify the database path,default is `/var/lib/kubeedge/edgecore.db`
