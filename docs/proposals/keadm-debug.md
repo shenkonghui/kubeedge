@@ -41,7 +41,7 @@ For edge, commands shall be:
 ### keadm debug  --help
 
 ```
-keadm help command provide debug function to help diagnose the cluster.
+keadm help command provide debug function to help diagnose the cluster
 
 Usage:
   keadm debug [command]
@@ -49,10 +49,10 @@ Usage:
 Examples:
 
 Available Commands:
-  diagnose        Diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
-  collect         Obtain all data of the current node, and then locate and use operation personnel.
-  check           Check whether the system specific items meet the requirements of edgecore installation and operation.
-  get             Get and format data of available resource types in the local database of the edge node.
+  diagnose        Diagnose specific fault scenarios in an all-round way and locate the cause of the fault
+  collect         Obtain all data of the current node, and then locate and use operation personnel
+  check           Check whether the system specific items meet the requirements of edgecore installation and operation
+  get             Get and format data of available resource types in the local database of the edge node
 
 Flags:
   -h, --help      help for keadm debug
@@ -62,7 +62,7 @@ Flags:
 ### keadm debug diagnose --help
 
 ```
-keadm diagnose command can be help to diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
+keadm diagnose command can be help to diagnose specific fault scenarios in an all-round way and locate the cause of the fault
 
 Usage:
   keadm debug diagnose [command]
@@ -83,7 +83,7 @@ Available Commands:
 ### keadm debug check --help
 
 ```
-keadm check command can be check whether the system specific items meet the requirements of edgecore installation and operation.
+keadm check command can be check whether the system specific items meet the requirements of edgecore installation and operation
 
 Usage:
   keadm debug check [command]
@@ -107,14 +107,14 @@ Flags:
 ### keadm debug collect --help
 
 ```
-Obtain all data of the current node, and then locate and use operation personnel.
+Obtain all the data of the current node, and then provide it to the operation and maintenance personnel to locate the problem
 
 Usage:
   keadm debug collect [flags]
 
 Examples:
 
-keadm debug collect --path . 
+keadm debug collect --path
 
 Flags:
   --config  Specify configuration file, defalut is /etc/kubeedge/config/edgecore.yaml
@@ -129,7 +129,7 @@ Flags:
 ### keadm debug get --help
 
 ```
-Prints a table of the most important information about the specified resource from the local database of the edge node.
+Prints a table of the most important information about the specified resource from the local database of the edge node
 
 Usage:
   keadm debug get [resource] [flags]
@@ -187,14 +187,14 @@ Flags:
        2. check pod  image can be right pull
        3. check pod schedule 
        4. check pod probe
-       5. many more
+       5. other more
     4. Use command `installation` is same as "keadm check all"
 
 `keadm debug check`
 
 - What is it?
   
-  - This command will be check whether the system specific items meet the requirements of edgecore installation and operation.
+  - This command will be check whether the system specific items meet the requirements of edgecore installation and operation
   
 - What shall be its scope ?
 
@@ -209,19 +209,19 @@ Flags:
     
    - aarch64 (arm64) architecture
        Ubuntu 18.04.2 LTS (Bionic Beaver)
-  3. Use command `cpu` can determine if the NUMBER of CPU cores meets the requirement, minimum 1Vcores.
-  4. Use command `memory` check the system memory size, and the amount of memory left, requirements minimum 256MB.
-  5. Use command `disk` check whether the disk meets the requirements, requirements minimum 1 GB.
-  6. Use command `dns` Check whether the node domain name resolution function is normal.
+  3. Use command `cpu` can determine if the NUMBER of CPU cores meets the requirement, minimum 1Vcores
+  4. Use command `memory` check the system memory size, and the amount of memory left, requirements minimum 256MB
+  5. Use command `disk` check whether the disk meets the requirements, requirements minimum 1 GB
+  6. Use command `dns` Check whether the node domain name resolution function is normal
   7. Use command `runtime `  Check whether the node container runtime function is installed, can use parameter `--runtime` to set container runtime,  default is docker
-  8. Use command `network `  check whether the node can communicate with the endpoint on the cloud,    can use parameter `--ip` to set test ip, default to ping clusterdns.
-  9. Use command `pid ` check if the current number of processes in the environment is too many. If the number of available processes is less than 5%, the number of processes is considered insufficient.
+  8. Use command `network `  check whether the node can communicate with the endpoint on the cloud,    can use parameter `--ip` to set test ip, default to ping clusterdns
+  9. Use command `pid ` check if the current number of processes in the environment is too many. If the number of available processes is less than 5%, the number of processes is considered insufficient
 
 `keadm debug collect`
 
 - What is it?
 
-  - This command will obtain all related data of the current node, and then locate and use  operation personnel.
+  - This command will obtain all related data of the current node, and then locate and use  operation personnel
 
 - What shall be its scope ?
 
@@ -279,7 +279,7 @@ Flags:
 
     Copy all files under /etc/kubeedge/certs/
 
-  - Edge-Core configuration file in  software (including Edge-daemon)
+  - Edge-Core configuration file in  software
 
     Copy all files under /etc/kubeedge/config/
 
@@ -291,8 +291,6 @@ Flags:
 
   - runtime log information
 
-  - runtime container information
-
   - runtime configuration and log information
 
   - runtime image information
@@ -301,7 +299,7 @@ Flags:
 
 - What is it?
   
-  - This command will get and format the specified resource`s information from the local database of the edge node.
+  - This command will get and format the specified resource`s information from the local database of the edge node
   
 - What shall be its scope ?
 
@@ -314,4 +312,5 @@ Flags:
     - `endpoint`
   2. Use flag `-n, --namespace=''` to indicate the scope of resource acquisition, if the flag `-A, --all-namespaces` is used, information of the specified resource will be obtained from all ranges
   3. Use flag `-o, --output=''` to indicate output format of the information 
-  4. Use flag `-l` to indicate which specified field is used to filter the data in the range
+  4. Use flag `-l, --selector=''` to indicate which specified field is used to filter the data in the range
+
