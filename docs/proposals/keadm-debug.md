@@ -51,7 +51,7 @@ For edge, commands shall be:
 ### keadm debug  --help
 
 ```
-keadm help command provide debug function to help diagnose the cluster.
+keadm help command provide debug function to help diagnose the cluster
 
 Usage:
   keadm debug [command]
@@ -72,7 +72,7 @@ Flags:
 ### keadm debug diagnose --help
 
 ```
-keadm diagnose command can be help to diagnose specific fault scenarios in an all-round way and locate the cause of the fault.
+keadm diagnose command can be help to diagnose specific fault scenarios in an all-round way and locate the cause of the fault
 
 Usage:
   keadm debug diagnose [command]
@@ -93,7 +93,7 @@ Available Commands:
 ### keadm debug check --help
 
 ```
-keadm check command can be check whether the system specific items meet the requirements of edgecore installation and operation.
+keadm check command can be check whether the system specific items meet the requirements of edgecore installation and operation
 
 Usage:
   keadm debug check [command]
@@ -117,14 +117,14 @@ Flags:
 ### keadm debug collect --help
 
 ```
-Obtain all the data of the current node, and then give it to the operation and maintenance personnel to locate the problem.
+Obtain all the data of the current node, and then provide it to the operation and maintenance personnel to locate the problem.
 
 Usage:
   keadm debug collect [flags]
 
 Examples:
 
-keadm debug collect --path . 
+keadm debug collect --path
 
 Flags:
   --config       Specify configuration file, defalut is /etc/kubeedge/config/edgecore.yaml
@@ -139,7 +139,7 @@ Flags:
 ### keadm debug get --help
 
 ```
-Prints a table of the most important information about the specified resource from the local database of the edge node.
+Prints a table of the most important information about the specified resource from the local database of the edge node
 
 Usage:
   keadm debug get [resource] [flags]
@@ -298,8 +298,6 @@ Flags:
 
   - runtime log information
 
-  - runtime container information
-
   - runtime configuration and log information
 
   - runtime image information
@@ -308,7 +306,7 @@ Flags:
 
 - What is it?
   
-  - This command will get and format the specified resource`s information from the local database of the edge node.
+  - This command will get and format the specified resource`s information from the local database of the edge node
   
 - What shall be its scope ?
 
