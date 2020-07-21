@@ -80,7 +80,7 @@ Usage:
 Examples:
 
 # view the running status of node (key components such as sqlite, edgehub, metamanager, edged and many more)
-keadm debug analysis node
+keadm debug diagnose node
 
 Available Commands:
   all           All resource
@@ -124,7 +124,7 @@ Usage:
 
 Examples:
 
-keadm debug collect --path
+keadm debug collect --output-path
 
 Flags:
   --config       Specify configuration file, defalut is /etc/kubeedge/config/edgecore.yaml
