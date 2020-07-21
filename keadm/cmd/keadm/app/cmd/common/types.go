@@ -41,6 +41,14 @@ type JoinOptions struct {
 	CertPort              string
 }
 
+//ColletcOptions has the kubeedge debug colletc information filled by CLI
+type ColletcOptions struct {
+	Config     string
+	OutputPath string
+	Detail     bool
+	LogPath    string
+}
+
 type ResetOptions struct {
 	Kubeconfig string
 }
