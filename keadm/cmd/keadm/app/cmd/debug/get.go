@@ -47,6 +47,19 @@ var (
 	# List the complete information of all available resources of edge nodes using the specified format (default: yaml)
 	keadm debug get all -o yaml
 `
+	// allowedFormats Currently supports formats such as yaml|json|wide
+	allowedFormats = []string{"yaml", "json", "wide"}
+
+	// availableResources Currently supports available Resource types in EdgeCore database.
+	availableResources = []string{
+		"all",
+		"pod",
+		"node",
+		"service",
+		"secret",
+		"configmap",
+		"endpoint",
+	}
 )
 
 // GetOptions contains the input to the get command.
@@ -90,13 +103,6 @@ func addGetOtherFlags(cmd *cobra.Command, getOption *GetOptions) {
 	cmd.Flags().BoolVarP(&getOption.AllNamespace, "all-namespaces", "A", getOption.AllNamespace, "List the requested object(s) across all namespaces")
 }
 
-// FileIsExist check file is exist
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-
-	return err == nil || !os.IsNotExist(err)
-}
-
 // NewGetOptions returns a GetOptions with default EdgeCore database source.
 func NewGetOptions() *GetOptions {
 	opts := &GetOptions{}
@@ -129,8 +135,22 @@ func (g *GetOptions) Validate(args []string) error {
 	return nil
 }
 
+// Execute performs the get operation.
+func Execute(opts *GetOptions, args []string) error {
+
+	return nil
+}
+
+// FileIsExist check file is exist
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+
+	return err == nil || !os.IsNotExist(err)
+}
+
+// IsAllowedFormat verification support format
+// TODO: add more output format, like kubectl get command.
 func IsAllowedFormat(oFormat string) bool {
-	allowedFormats := []string{"yaml", "json", "wide"}
 	for _, aFormat := range allowedFormats {
 		if oFormat == aFormat {
 			return true
@@ -138,9 +158,4 @@ func IsAllowedFormat(oFormat string) bool {
 	}
 
 	return false
-}
-
-func Execute(opts *GetOptions, args []string) error {
-
-	return nil
 }
