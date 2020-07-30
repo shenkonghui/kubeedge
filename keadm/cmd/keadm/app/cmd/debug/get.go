@@ -18,7 +18,10 @@ package debug
 
 import (
 	"fmt"
-	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
+	"github.com/astaxie/beego/orm"
+	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
+	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 	"github.com/spf13/cobra"
 	"io"
 	"os"
@@ -106,7 +109,7 @@ func addGetOtherFlags(cmd *cobra.Command, getOption *GetOptions) {
 // NewGetOptions returns a GetOptions with default EdgeCore database source.
 func NewGetOptions() *GetOptions {
 	opts := &GetOptions{}
-	opts.DataPath = common.DefaultEdgeDataPath
+	opts.DataPath = edgecoreCfg.DataBaseDataSource
 
 	return opts
 }
@@ -117,13 +120,19 @@ func (g *GetOptions) Validate(args []string) error {
 		return fmt.Errorf("You must specify the type of resource to get. ")
 	}
 	if g.AllNamespace == false && len(g.Namespace) == 0 {
-		return fmt.Errorf("You must specify the namespace of resource to get. ")
+		g.Namespace = "default"
 	}
 	if len(g.DataPath) == 0 {
 		fmt.Printf("Failed to get the EdgeCore database path, will use default path: %v. ", g.DataPath)
 	}
 	if !FileExists(g.DataPath) {
 		return fmt.Errorf("EdgeCore database file %v not exist. ", g.DataPath)
+	}
+
+	//TODO: whether to get the parameters from the edgecore configuration file
+	err := InitDB(edgecoreCfg.DataBaseDriverName, edgecoreCfg.DataBaseAliasName, g.DataPath)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize database: %v ", err)
 	}
 	if len(g.OutputFormat) > 0 {
 		g.OutputFormat = strings.ToLower(g.OutputFormat)
@@ -137,7 +146,19 @@ func (g *GetOptions) Validate(args []string) error {
 
 // Execute performs the get operation.
 func Execute(opts *GetOptions, args []string) error {
+	if opts.AllNamespace {
+		opts.Namespace = "all"
+	}
 
+	results, err := QueryMetaFromLocal(opts.Namespace, args[0])
+	if err != nil {
+		return err
+	}
+	if len(*results) == 0 {
+		return fmt.Errorf("No resources found in namespace: %v ", opts.Namespace)
+	}
+
+	fmt.Print(results)
 	return nil
 }
 
@@ -149,7 +170,6 @@ func FileExists(path string) bool {
 }
 
 // IsAllowedFormat verification support format
-// TODO: add more output format, like kubectl get command.
 func IsAllowedFormat(oFormat string) bool {
 	for _, aFormat := range allowedFormats {
 		if oFormat == aFormat {
@@ -158,4 +178,141 @@ func IsAllowedFormat(oFormat string) bool {
 	}
 
 	return false
+}
+
+// InitDB Init DB info
+func InitDB(driverName, dbName, dataSource string) error {
+	if err := orm.RegisterDriver(driverName, orm.DRSqlite); err != nil {
+		return fmt.Errorf("Failed to register driver: %v ", err)
+	}
+	if err := orm.RegisterDataBase(
+		dbName,
+		driverName,
+		dataSource); err != nil {
+		return fmt.Errorf("Failed to register db: %v ", err)
+	}
+	orm.RegisterModel(new(dao.Meta))
+
+	// create orm
+	dbm.DBAccess = orm.NewOrm()
+	if err := dbm.DBAccess.Using(dbName); err != nil {
+		return fmt.Errorf("Using db access error %v ", err)
+	}
+	return nil
+}
+
+// QueryMetaFromLocal
+func QueryMetaFromLocal(np string, resourceType string) (*[]dao.Meta, error) {
+	var err error
+	var results *[]dao.Meta
+
+	if np == "all" {
+		switch resourceType {
+		case "pod":
+			results, err = dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.type in ('pod','podlist')",
+					dao.MetaTableName,
+					dao.MetaTableName))
+			if err != nil {
+				return nil, err
+			}
+			return results, nil
+		case "service":
+			results, err = dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.type in ('service','servicelist')",
+					dao.MetaTableName,
+					dao.MetaTableName))
+			if err != nil {
+				return nil, err
+			}
+			return results, nil
+		case "endpoints":
+			results, err = dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.type in ('endpoints','endpointslist')",
+					dao.MetaTableName,
+					dao.MetaTableName))
+			if err != nil {
+				return nil, err
+			}
+			return results, nil
+		case "all":
+			results, err = dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v ",
+					dao.MetaTableName))
+			if err != nil {
+				return nil, err
+			}
+			return results, nil
+		default:
+			results, err = dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.type = '%v'",
+					dao.MetaTableName,
+					dao.MetaTableName,
+					resourceType))
+			if err != nil {
+				return nil, err
+			}
+			return results, nil
+		}
+	}
+
+	switch resourceType {
+	case "pod":
+		results, err = dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.type in ('pod','podlist') and %v.key like '%v/%%'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				dao.MetaTableName,
+				np))
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
+	case "service":
+		results, err = dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.type in ('service','servicelist') and %v.key like '%v/%%'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				dao.MetaTableName,
+				np))
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
+	case "endpoints":
+		results, err = dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.type in ('endpoints','endpointslist') and %v.key like '%v/%%'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				dao.MetaTableName,
+				np))
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
+	case "all":
+		results, err = dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.key like '%v/%%'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				np))
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
+	default:
+		results, err = dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.type = '%v' and %v.key like '%v/%%'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				resourceType,
+				dao.MetaTableName,
+				np))
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
+	}
+
+	return results, nil
 }

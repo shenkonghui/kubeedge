@@ -101,3 +101,14 @@ func QueryAllMeta(key string, condition string) (*[]Meta, error) {
 
 	return meta, nil
 }
+
+// QueryMetaByRaw return all meta using the specified SQL statement
+func QueryMetaByRaw(query string) (*[]Meta, error) {
+	meta := new([]Meta)
+	_, err := dbm.DBAccess.Raw(query).QueryRows(meta)
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}

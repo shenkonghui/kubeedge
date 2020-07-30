@@ -161,4 +161,9 @@ const (
 	ResourceTypePodlist    = "podlist"
 	ResourceTypePodStatus  = "podstatus"
 	ResourceTypeNodeStatus = "nodestatus"
+
+	//ResourceTypeService       = "service"
+	//ResourceTypeServiceList   = "servicelist"
+	//ResourceTypeEndpoints     = "endpoints"
+	//ResourceTypeEndpointsList = "endpointslist"
 )
