@@ -151,3 +151,14 @@ const (
 	KubeEdge          = "kubeedge"
 	KubeEdgeNameSpace = "kubeedge"
 )
+
+// EdgeCore database resource type define
+const (
+	ResourceTypePod        = "pod"
+	ResourceTypeConfigmap  = "configmap"
+	ResourceTypeSecret     = "secret"
+	ResourceTypeNode       = "node"
+	ResourceTypePodlist    = "podlist"
+	ResourceTypePodStatus  = "podstatus"
+	ResourceTypeNodeStatus = "nodestatus"
+)
