@@ -73,4 +73,93 @@ const (
 	TokenSecretName = "tokensecret"
 
 	TokenDataName = "tokendata"
+
+	ArgCheckAll     = "all"
+	ArgCheckArch    = "arch"
+	ArgCheckCPU     = "cpu"
+	ArgCheckMemory  = "mem"
+	ArgCheckDisk    = "disk"
+	ArgCheckDNS     = "dns"
+	ArgCheckRuntime = "runtime"
+	ArgCheckNetwork = "network"
+	ArgCheckPID     = "pid"
+
+	DescAll     = "Check all item"
+	DescArch    = "Check whether the architecture can work"
+	DescCPU     = "Check node CPU requirements"
+	DescMemory  = "Check node memory requirements"
+	Descdisk    = "Check node disk requirements"
+	DescDNS     = "Check whether DNS can work"
+	DescRuntime = "Check whether runtime can work"
+	DescNetwork = "Check whether the network is normal"
+	DescPID     = "Check node PID requirements"
+
+	CmdGetArch       = "arch"
+	CmdGetCPUNum     = "cat /proc/cpuinfo  |grep processor| wc -l"
+	CmdGetMenorySize = "free -h |grep Mem|awk '{print $2}'"
+	// Use regular expressions to filter the ones that are not empty after "/"
+	CmdGetDiskSize      = "df -h |grep -ve \" /.\"|sed -n \"2p\"|awk '{print $2}'"
+	CmdGetDNSIP         = "cat /etc/resolv.conf |grep nameserver|grep -v ':'|awk '{print $2}'|sed -n '1p'"
+	CmdGetStatusDocker  = "systemctl status docker |grep Active | awk '{print $2}'"
+	CmdPing             = "ping %s -w %d |grep 'packets transmitted' |awk '{print $4}'"
+	CmdGetMaxProcessNum = "sysctl kernel.pid_max|awk '{print $3}'"
+	CmdGetProcessNum    = "ps -A|wc -l"
+
+	AllowedValueCPU     = "1"
+	AllowedValueMemory  = "256MB"
+	AllowedValueDisk    = "1GB"
+	AllowedValuePIDRate = 0.05
+
+	DefaultDomain = "www.github.com"
+
+	UnitCore = "core"
+	UnitMB   = "MB"
+	UnitGB   = "GB"
+
+	KB int = 1024
+	MB int = KB * 1024
+	GB int = MB * 1024
+)
+
+var (
+	AllowedValueArch = []string{"amd64", "arm64v8", "arm32v7", "i386", "s390x", "x86_64", "aarch64"}
+
+	CheckObjectMap = []CheckObject{
+		{
+			Use:  ArgCheckAll,
+			Desc: DescAll,
+		},
+		{
+			Use:  ArgCheckArch,
+			Desc: DescArch,
+		},
+		{
+			Use:  ArgCheckCPU,
+			Desc: DescCPU,
+		},
+		{
+			Use:  ArgCheckMemory,
+			Desc: DescMemory,
+		},
+		{
+			Use:  ArgCheckDisk,
+			Desc: Descdisk,
+		},
+		{
+			Use:  ArgCheckDNS,
+			Desc: DescDNS,
+		},
+		{
+			Use:  ArgCheckRuntime,
+			Desc: DescRuntime,
+		},
+		{
+			Use:  ArgCheckNetwork,
+			Desc: DescNetwork,
+		},
+		{
+			Use:  ArgCheckPID,
+			Desc: DescPID,
+		},
+	}
 )

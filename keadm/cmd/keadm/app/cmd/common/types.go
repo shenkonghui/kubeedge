@@ -41,6 +41,20 @@ type JoinOptions struct {
 	CertPort              string
 }
 
+type CheckOptions struct {
+	Domain     string
+	IP         string
+	Runtime    string
+	Timeout    int
+	EdgeHubURL string
+}
+
+type CheckObject struct {
+	Use  string
+	Desc string
+	Cmd  string
+}
+
 type ResetOptions struct {
 	Kubeconfig string
 }
