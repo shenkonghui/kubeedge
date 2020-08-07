@@ -25,6 +25,9 @@ import (
 
 	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
@@ -167,12 +170,10 @@ func (g *GetOptions) Validate(args []string) error {
 
 // Execute performs the get operation.
 func Execute(opts *GetOptions, args []string, out io.Writer) error {
-	var results []dao.Meta
-	var err error
 	//var printer printers.ResourcePrinter
 	resType := args[0]
 	resNames := args[1:]
-	results, err = QueryMetaFromDatabase(opts.AllNamespace, opts.Namespace, resType, resNames)
+	results, err := QueryMetaFromDatabase(opts.AllNamespace, opts.Namespace, resType, resNames)
 	if err != nil {
 		return err
 	}
@@ -180,8 +181,43 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	resObj, err := ToObject(results)
+	if err != nil {
+		return err
+	}
 
+	fmt.Printf("\n*********************************result*******************************\n%v", resObj.GetObjectKind())
 	return nil
+}
+
+func ToObject(results []dao.Meta) (runtime.Object, error) {
+	var raw []runtime.RawExtension
+	metaJson := make(map[string]interface{})
+	for _, data := range results {
+		if err := json.Unmarshal([]byte(data.Value), &metaJson); err != nil {
+			return nil, err
+		}
+		metaJson["apiVersion"] = "v1"
+		metaJson["kind"] = data.Type
+		metaByte, err := json.Marshal(metaJson)
+		if err != nil {
+			return nil, err
+		}
+		metaObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, metaByte)
+		if err != nil {
+			return nil, err
+		}
+		raw = append(raw, runtime.RawExtension{Object: metaObj})
+	}
+
+	return &metav1.List{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "List",
+		},
+		ListMeta: metav1.ListMeta{},
+		Items:    raw,
+	}, nil
 }
 
 // FileIsExist check file is exist
