@@ -17,23 +17,25 @@ limitations under the License.
 package debug
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego/orm"
-	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
-	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
-	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/astaxie/beego/orm"
+	"github.com/spf13/cobra"
+
+	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
+	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 )
 
 var (
-	debugGetLongDescription = `
-Prints a table of the most important information about the specified resource from the local database of the edge node
-`
-	debugGetShortDescription = `Get and format data of available resource types in the local database of the edge node
-`
+	debugGetLong = `
+Prints a table of the most important information about the specified resource from the local database of the edge node.`
+	debugGetShort = `
+Get and format data of available resource types in the local database of the edge node.`
 	debugGetExample = `
 # List all pod
 keadm debug get pod -A
@@ -48,30 +50,30 @@ keadm debug get configmap web -n default
 keadm debug get configmap web -n default -o yaml
 
 # List the complete information of all available resources of edge nodes using the specified format (default: yaml)
-keadm debug get all -o yaml
-`
+keadm debug get all -o yaml`
+
 	// allowedFormats Currently supports formats such as yaml|json|wide
 	allowedFormats = []string{"yaml", "json", "wide"}
 
 	// availableResources Convert flag to currently supports available Resource types in EdgeCore database.
 	availableResources = map[string]string{
-		"all":        "'all'",
-		"po":         "'pod','podlist'",
-		"pod":        "'pod','podlist'",
-		"pods":       "'pod','podlist'",
-		"node":       "'node'",
-		"nodes":      "'node'",
-		"svc":        "'service','servicelist'",
-		"service":    "'service','servicelist'",
-		"services":   "'service','servicelist'",
+		"all":        "'pod','nodestatus','service','secret','configmap','endpoints'",
+		"po":         "'pod'",
+		"pod":        "'pod'",
+		"pods":       "'pod'",
+		"node":       "'nodestatus'",
+		"nodes":      "'nodestatus'",
+		"svc":        "'service'",
+		"service":    "'service'",
+		"services":   "'service'",
 		"secret":     "'secret'",
 		"secrets":    "'secret'",
 		"cm":         "'configmap'",
 		"configmap":  "'configmap'",
 		"configmaps": "'configmap'",
-		"ep":         "'endpoints','endpointslist'",
-		"endpoint":   "'endpoints','endpointslist'",
-		"endpoints":  "'endpoints','endpointslist'",
+		"ep":         "'endpoints'",
+		"endpoint":   "'endpoints'",
+		"endpoints":  "'endpoints'",
 	}
 )
 
@@ -82,6 +84,8 @@ type GetOptions struct {
 	OutputFormat  string
 	LabelSelector string
 	DataPath      string
+
+	PrintFlags *PrintFlags
 }
 
 // NewCmdDebugGet returns keadm debug get command.
@@ -92,15 +96,15 @@ func NewCmdDebugGet(out io.Writer, getOption *GetOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   debugGetShortDescription,
-		Long:    debugGetLongDescription,
+		Short:   debugGetShort,
+		Long:    debugGetLong,
 		Example: debugGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := getOption.Validate(args)
 			if err != nil {
 				return err
 			}
-			return Execute(getOption, args)
+			return Execute(getOption, args, out)
 		},
 	}
 	addGetOtherFlags(cmd, getOption)
@@ -118,9 +122,11 @@ func addGetOtherFlags(cmd *cobra.Command, getOption *GetOptions) {
 
 // NewGetOptions returns a GetOptions with default EdgeCore database source.
 func NewGetOptions() *GetOptions {
-	opts := &GetOptions{}
-	opts.DataPath = edgecoreCfg.DataBaseDataSource
-	opts.Namespace = "default"
+	opts := &GetOptions{
+		Namespace:  "default",
+		DataPath:   edgecoreCfg.DataBaseDataSource,
+		PrintFlags: NewGetPrintFlags(),
+	}
 
 	return opts
 }
@@ -131,16 +137,15 @@ func (g *GetOptions) Validate(args []string) error {
 		return fmt.Errorf("You must specify the type of resource to get. ")
 	}
 	if !IsAvailableResources(args[0]) {
-		return fmt.Errorf("Input does not support resource type: %v. ", args[0])
+		return fmt.Errorf("Unrecognized resource type: %v. ", args[0])
 	}
 	if len(g.DataPath) == 0 {
-		fmt.Printf("Failed to get the EdgeCore database path, will use default path: %v. ", g.DataPath)
+		fmt.Printf("Not specified the EdgeCore database path, use the default path: %v. ", g.DataPath)
 	}
 	if !FileExists(g.DataPath) {
 		return fmt.Errorf("EdgeCore database file %v not exist. ", g.DataPath)
 	}
 
-	//TODO: whether to get the parameters from the edgecore configuration file
 	err := InitDB(edgecoreCfg.DataBaseDriverName, edgecoreCfg.DataBaseAliasName, g.DataPath)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize database: %v ", err)
@@ -151,21 +156,31 @@ func (g *GetOptions) Validate(args []string) error {
 			return fmt.Errorf("OutputFormat %v not supportted. Currently supports formats such as yaml|json|wide", g.OutputFormat)
 		}
 	}
+	g.PrintFlags.OutputFormat = &g.OutputFormat
+
+	if args[0] == "all" && len(args) >= 2 {
+		return fmt.Errorf("you must specify only one resource")
+	}
 
 	return nil
 }
 
 // Execute performs the get operation.
-func Execute(opts *GetOptions, args []string) error {
-	if opts.AllNamespace {
-		opts.Namespace = "AllNamespace"
-	}
-	results, err := QueryMetaFromLocal(opts.Namespace, args[0])
+func Execute(opts *GetOptions, args []string, out io.Writer) error {
+	var results []dao.Meta
+	var err error
+	//var printer printers.ResourcePrinter
+	resType := args[0]
+	resNames := args[1:]
+	results, err = QueryMetaFromDatabase(opts.AllNamespace, opts.Namespace, resType, resNames)
 	if err != nil {
-		return fmt.Errorf("Faild get resources: %v ", err)
+		return err
+	}
+	results, err = FilterSelector(results, opts.LabelSelector)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("****************************输出结果**************************************\n%v \n", results)
 	return nil
 }
 
@@ -214,52 +229,154 @@ func InitDB(driverName, dbName, dataSource string) error {
 	return nil
 }
 
-// QueryMetaFromLocal
-func QueryMetaFromLocal(np string, resourceType string) (*[]dao.Meta, error) {
-	var err error
-	var results *[]dao.Meta
+// QueryMetaFromDatabase Filter data from the database based on conditions
+func QueryMetaFromDatabase(isAllNamespace bool, resNamePaces string, resType string, resNames []string) ([]dao.Meta, error) {
+	var results []dao.Meta
 
-	if np == "AllNamespace" {
-		if resourceType == "all" {
-			results, err = dao.QueryMetaByRaw(
-				fmt.Sprintf("select * from %v ",
-					dao.MetaTableName))
+	if isAllNamespace {
+		if resType == "all" || len(resNames) == 0 {
+			results, err := dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.type in (%v)",
+					dao.MetaTableName,
+					dao.MetaTableName,
+					availableResources[resType]))
 			if err != nil {
 				return nil, err
 			}
+
 			return results, nil
 		}
-		results, err = dao.QueryMetaByRaw(
-			fmt.Sprintf("select * from %v where %v.type in (%v)",
-				dao.MetaTableName,
-				dao.MetaTableName,
-				availableResources[resourceType]))
-		if err != nil {
-			return nil, err
+		for _, resName := range resNames {
+			result, err := dao.QueryMetaByRaw(
+				fmt.Sprintf("select * from %v where %v.key like '%%/%v/%v'",
+					dao.MetaTableName,
+					dao.MetaTableName,
+					strings.ReplaceAll(availableResources[resType], "'", ""),
+					resName))
+			fmt.Printf("result: %v", result)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, result...)
 		}
-		return results, nil
 
+		return results, nil
 	}
-	if resourceType == "all" {
-		results, err = dao.QueryMetaByRaw(
-			fmt.Sprintf("select * from %v where %v.key like '%v/%%'",
+	if resType == "all" || len(resNames) == 0 {
+		results, err := dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.key like '%v/%%' and  %v.type in (%v)",
 				dao.MetaTableName,
 				dao.MetaTableName,
-				np))
+				resNamePaces,
+				dao.MetaTableName,
+				availableResources[resType]))
 		if err != nil {
 			return nil, err
 		}
+
 		return results, nil
 	}
-	results, err = dao.QueryMetaByRaw(
-		fmt.Sprintf("select * from %v where %v.type in (%v) and %v.key like '%v/%%'",
-			dao.MetaTableName,
-			dao.MetaTableName,
-			availableResources[resourceType],
-			dao.MetaTableName,
-			np))
+	for _, resName := range resNames {
+		result, err := dao.QueryMetaByRaw(
+			fmt.Sprintf("select * from %v where %v.key = '%v/%v/%v'",
+				dao.MetaTableName,
+				dao.MetaTableName,
+				resNamePaces,
+				strings.ReplaceAll(availableResources[resType], "'", ""),
+				resName))
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result...)
+	}
+
+	return results, nil
+}
+
+// FilterSelector Filter data that meets the selector
+func FilterSelector(data []dao.Meta, selector string) ([]dao.Meta, error) {
+	var results []dao.Meta
+	var jsonValue = make(map[string]interface{})
+
+	sLabels, err := SplitSelectorParameters(selector)
 	if err != nil {
 		return nil, err
+	}
+	for _, v := range data {
+		err := json.Unmarshal([]byte(v.Value), &jsonValue)
+		if err != nil {
+			return nil, err
+		}
+		vLabel := jsonValue["metadata"].(map[string]interface{})["labels"]
+		if vLabel == nil {
+			results = append(results, v)
+			continue
+		}
+		flag := true
+		for _, sl := range sLabels {
+			if !sl.Exist {
+				flag = flag && vLabel.(map[string]interface{})[sl.Key] != sl.Value
+				continue
+			}
+			flag = flag && (vLabel.(map[string]interface{})[sl.Key] == sl.Value)
+
+		}
+
+		if flag {
+			results = append(results, v)
+		}
+
+	}
+
+	return results, nil
+}
+
+// Selector
+type Selector struct {
+	Key   string
+	Value string
+	Exist bool
+}
+
+// SplitSelectorParameters Split selector args (flag: -l)
+func SplitSelectorParameters(args string) ([]Selector, error) {
+	var results = make([]Selector, 0)
+	var sel Selector
+	labels := strings.Split(args, ",")
+	for _, label := range labels {
+		if strings.Contains(label, "==") {
+			labs := strings.Split(label, "==")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("arguments in selector form may not have more than one \"==\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = true
+			results = append(results, sel)
+			continue
+		}
+		if strings.Contains(label, "!=") {
+			labs := strings.Split(label, "!=")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("arguments in selector form may not have more than one \"!=\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = false
+			results = append(results, sel)
+			continue
+		}
+		if strings.Contains(label, "=") {
+			labs := strings.Split(label, "=")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("arguments in selector may not have more than one \"=\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = true
+			results = append(results, sel)
+		}
+
 	}
 	return results, nil
 
