@@ -1,7 +1,6 @@
 package debug
 
 import (
-	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -32,7 +31,6 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
 	}
-	fmt.Printf("\noutput: %v", outputFormat)
 	noHeaders := false
 	if f.NoHeaders != nil {
 		noHeaders = *f.NoHeaders

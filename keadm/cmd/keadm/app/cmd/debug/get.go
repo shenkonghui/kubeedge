@@ -18,29 +18,26 @@ package debug
 
 import (
 	"context"
-	//"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/cli-runtime/pkg/printers"
-	v1 "k8s.io/kubernetes/pkg/apis/core"
-	k8sprinters "k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"os"
 	"strings"
-
-	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/kubectl/pkg/scheme"
+	v1 "k8s.io/kubernetes/pkg/apis/core"
+	k8sprinters "k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	"k8s.io/kubernetes/pkg/printers/storage"
 
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
 	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
-	"k8s.io/kubernetes/pkg/printers/storage"
 )
 
 var (
@@ -69,12 +66,10 @@ keadm debug get all -o yaml`
 
 	// availableResources Convert flag to currently supports available Resource types in EdgeCore database.
 	availableResources = map[string]string{
-		"all":        "'pod','nodestatus','service','secret','configmap','endpoints'",
+		"all":        "'pod','service','secret','configmap','endpoints'",
 		"po":         "'pod'",
 		"pod":        "'pod'",
 		"pods":       "'pod'",
-		"node":       "'nodestatus'",
-		"nodes":      "'nodestatus'",
 		"svc":        "'service'",
 		"service":    "'service'",
 		"services":   "'service'",
@@ -186,11 +181,14 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if len(results) == 0 {
+		fmt.Fprintf(out, "No resources found in %v namespace.\n", opts.Namespace)
+	}
 	results, err = FilterSelector(results, opts.LabelSelector)
 	if err != nil {
 		return err
 	}
-	resObj, err := ToK8sObject(results)
+	podList, serviceList, secretList, configMapList, endPointsList, err := ParseMetaToList(results)
 	if err != nil {
 		return err
 	}
@@ -200,69 +198,230 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
 	printer, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(printer, nil)
+	if opts.OutputFormat == "" || opts.OutputFormat == "wide" {
+		if podList != nil {
+			talbe, err := ConvertDataToTable(podList)
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(talbe, out)
+		}
+		if serviceList != nil {
+			talbe, err := ConvertDataToTable(serviceList)
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(talbe, out)
+		}
+		if secretList != nil {
+			talbe, err := ConvertDataToTable(secretList)
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(talbe, out)
+		}
+		if configMapList != nil {
+			talbe, err := ConvertDataToTable(configMapList)
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(talbe, out)
+		}
+		if endPointsList != nil {
+			talbe, err := ConvertDataToTable(endPointsList)
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(talbe, out)
+		}
+		return nil
+	}
 
-	printer.PrintObj(resObj, out)
+	if podList != nil {
+		for _, obj := range podList.Items {
+			printer.PrintObj(&obj, out)
+		}
 
-	fmt.Printf("\n*********************************result*******************************\n%v", resObj.GetObjectKind())
+	}
+	if serviceList != nil {
+		printer.PrintObj(serviceList, out)
+	}
+	if secretList != nil {
+		printer.PrintObj(secretList, out)
+	}
+	if configMapList != nil {
+		printer.PrintObj(configMapList, out)
+	}
+	if endPointsList != nil {
+		printer.PrintObj(endPointsList, out)
+	}
+
 	return nil
 }
 
-func ToObject(results []dao.Meta) (runtime.Object, error) {
-	var raw []runtime.RawExtension
-	metaJson := make(map[string]interface{})
-	for _, data := range results {
-		if err := json.Unmarshal([]byte(data.Value), &metaJson); err != nil {
-			return nil, err
-		}
-		metaJson["apiVersion"] = "v1"
-		metaJson["kind"] = data.Type
-		metaByte, err := json.Marshal(metaJson)
-		if err != nil {
-			return nil, err
-		}
-		metaObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, metaByte)
-		if err != nil {
-			return nil, err
-		}
-		raw = append(raw, runtime.RawExtension{Object: metaObj})
-	}
-
-	return &metav1.List{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "List",
-		},
-		ListMeta: metav1.ListMeta{},
-		Items:    raw,
-	}, nil
-}
-
-func ToK8sObject(results []dao.Meta) (runtime.Object, error) {
-
-	value := make(map[string]interface{})
-	podlist := &v1.PodList{}
-	for _, data := range results {
-
-		pod := v1.Pod{}
-
-		json.Unmarshal([]byte(data.Value), &value)
-		metadata, _ := json.Marshal(value["metadata"])
-		spec, _ := json.Marshal(value["spec"])
-		status, _ := json.Marshal(value["status"])
-		json.Unmarshal(metadata, &pod.ObjectMeta)
-		json.Unmarshal(spec, &pod.Spec)
-		json.Unmarshal(status, &pod.Status)
-
-		podlist.Items = append(podlist.Items, pod)
-	}
-
+func ConvertDataToTable(obj runtime.Object) (runtime.Object, error) {
 	to := metav1.TableOptions{}
 	tc := storage.TableConvertor{TableGenerator: k8sprinters.NewTableGenerator().With(printersinternal.AddHandlers)}
-	tables, err := tc.ConvertToTable(context.TODO(), podlist, &to)
 
-	return tables, err
+	return tc.ConvertToTable(context.TODO(), obj, &to)
+}
+
+// ParseMetaToList
+func ParseMetaToList(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.SecretList, *v1.ConfigMapList, *v1.EndpointsList, error) {
+	podList := &v1.PodList{}
+	serviceList := &v1.ServiceList{}
+	secretList := &v1.SecretList{}
+	configMapList := &v1.ConfigMapList{}
+	endPointsList := &v1.EndpointsList{}
+	value := make(map[string]interface{})
+
+	for _, v := range results {
+		switch v.Type {
+		case "pod":
+			pod := v1.Pod{}
+
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			spec, err := json.Marshal(value["spec"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			status, err := json.Marshal(value["status"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &pod.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(spec, &pod.Spec); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(status, &pod.Status); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			pod.APIVersion = "v1"
+			pod.Kind = v.Type
+			pod.Name = v.Key
+			podList.Items = append(podList.Items, pod)
+
+		case "service":
+			svc := v1.Service{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			spec, err := json.Marshal(value["spec"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			status, err := json.Marshal(value["status"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &svc.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(spec, &svc.Spec); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(status, &svc.Status); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			svc.APIVersion = "v1"
+			svc.Kind = v.Type
+			svc.Name = v.Key
+			serviceList.Items = append(serviceList.Items, svc)
+		case "secret":
+			secret := v1.Secret{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			data, err := json.Marshal(value["data"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			typeTmp, err := json.Marshal(value["type"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &secret.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(data, &secret.Data); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(typeTmp, &secret.Type); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			secret.APIVersion = "v1"
+			secret.Kind = v.Type
+			secret.Name = v.Key
+			secretList.Items = append(secretList.Items, secret)
+		case "configmap":
+			cmp := v1.ConfigMap{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			data, err := json.Marshal(value["data"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &cmp.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(data, &cmp.Data); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			cmp.APIVersion = "v1"
+			cmp.Kind = v.Type
+			cmp.Name = v.Key
+			configMapList.Items = append(configMapList.Items, cmp)
+		case "endpoints":
+			ep := v1.Endpoints{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			subsets, err := json.Marshal(value["subsets"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &ep.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(subsets, &ep.Subsets); err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			ep.APIVersion = "v1"
+			ep.Kind = v.Type
+			ep.Name = v.Key
+			endPointsList.Items = append(endPointsList.Items, ep)
+		default:
+			return nil, nil, nil, nil, nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
+		}
+	}
+
+	return podList, serviceList, secretList, configMapList, endPointsList, nil
 }
 
 // FileIsExist check file is exist
@@ -334,7 +493,6 @@ func QueryMetaFromDatabase(isAllNamespace bool, resNamePaces string, resType str
 					dao.MetaTableName,
 					strings.ReplaceAll(availableResources[resType], "'", ""),
 					resName))
-			fmt.Printf("result: %v", result)
 			if err != nil {
 				return nil, err
 			}
