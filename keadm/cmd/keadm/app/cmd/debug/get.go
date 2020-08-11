@@ -17,11 +17,19 @@ limitations under the License.
 package debug
 
 import (
+	"context"
+	//"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/cli-runtime/pkg/printers"
+	v1 "k8s.io/kubernetes/pkg/apis/core"
+	k8sprinters "k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"os"
 	"strings"
+
+	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
@@ -32,6 +40,7 @@ import (
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
 	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
+	"k8s.io/kubernetes/pkg/printers/storage"
 )
 
 var (
@@ -181,10 +190,20 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	resObj, err := ToObject(results)
+	resObj, err := ToK8sObject(results)
 	if err != nil {
 		return err
 	}
+
+	opts.PrintFlags.OutputFormat = &opts.OutputFormat
+	printer, err := opts.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	printer, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(printer, nil)
+
+	printer.PrintObj(resObj, out)
 
 	fmt.Printf("\n*********************************result*******************************\n%v", resObj.GetObjectKind())
 	return nil
@@ -218,6 +237,32 @@ func ToObject(results []dao.Meta) (runtime.Object, error) {
 		ListMeta: metav1.ListMeta{},
 		Items:    raw,
 	}, nil
+}
+
+func ToK8sObject(results []dao.Meta) (runtime.Object, error) {
+
+	value := make(map[string]interface{})
+	podlist := &v1.PodList{}
+	for _, data := range results {
+
+		pod := v1.Pod{}
+
+		json.Unmarshal([]byte(data.Value), &value)
+		metadata, _ := json.Marshal(value["metadata"])
+		spec, _ := json.Marshal(value["spec"])
+		status, _ := json.Marshal(value["status"])
+		json.Unmarshal(metadata, &pod.ObjectMeta)
+		json.Unmarshal(spec, &pod.Spec)
+		json.Unmarshal(status, &pod.Status)
+
+		podlist.Items = append(podlist.Items, pod)
+	}
+
+	to := metav1.TableOptions{}
+	tc := storage.TableConvertor{TableGenerator: k8sprinters.NewTableGenerator().With(printersinternal.AddHandlers)}
+	tables, err := tc.ConvertToTable(context.TODO(), podlist, &to)
+
+	return tables, err
 }
 
 // FileIsExist check file is exist
