@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"os"
 	"strings"
 
@@ -238,23 +240,65 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 		return nil
 	}
 
-	if podList != nil {
-		for _, obj := range podList.Items {
-			printer.PrintObj(&obj, out)
+	var obj runtime.Object
+	if len(podList.Items) != 1 {
+		list := v1.List{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "List",
+				APIVersion: "v1",
+			},
+			ListMeta: metav1.ListMeta{},
+		}
+		for _, info := range podList.Items {
+			o := info.DeepCopyObject()
+			list.Items = append(list.Items, o)
 		}
 
+		listData, err := json.Marshal(list)
+		if err != nil {
+			return err
+		}
+
+		converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, listData)
+		if err != nil {
+			return err
+		}
+		obj = converted
+	} else {
+		obj = podList.Items[0].DeepCopyObject()
 	}
-	if serviceList != nil {
-		printer.PrintObj(serviceList, out)
-	}
-	if secretList != nil {
-		printer.PrintObj(secretList, out)
-	}
-	if configMapList != nil {
-		printer.PrintObj(configMapList, out)
-	}
-	if endPointsList != nil {
-		printer.PrintObj(endPointsList, out)
+
+	isList := meta.IsListType(obj)
+	if isList {
+		items, err := meta.ExtractList(obj)
+		if err != nil {
+			return err
+		}
+
+		// take the items and create a new list for display
+		list := &unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"kind":       "List",
+				"apiVersion": "v1",
+				"metadata":   map[string]interface{}{},
+			},
+		}
+		if listMeta, err := meta.ListAccessor(obj); err == nil {
+			list.Object["metadata"] = map[string]interface{}{
+				"selfLink":        listMeta.GetSelfLink(),
+				"resourceVersion": listMeta.GetResourceVersion(),
+			}
+		}
+
+		for _, item := range items {
+			list.Items = append(list.Items, *item.(*unstructured.Unstructured))
+		}
+		printer.PrintObj(list, out)
+	} else {
+		var ib map[string]interface{}
+		b, _ := json.Marshal(obj)
+		json.Unmarshal(b, &ib)
+		printer.PrintObj(&unstructured.Unstructured{Object: ib}, out)
 	}
 
 	return nil
