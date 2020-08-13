@@ -28,11 +28,12 @@ import (
 
 	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubectl/pkg/scheme"
-	v1 "k8s.io/kubernetes/pkg/apis/core"
+	//v1 "k8s.io/kubernetes/pkg/apis/core"
 	k8sprinters "k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/pkg/printers/storage"
@@ -251,7 +252,7 @@ func Execute(opts *GetOptions, args []string, out io.Writer) error {
 		}
 		for _, info := range podList.Items {
 			o := info.DeepCopyObject()
-			list.Items = append(list.Items, o)
+			list.Items = append(list.Items, runtime.RawExtension{Object: o})
 		}
 
 		listData, err := json.Marshal(list)
