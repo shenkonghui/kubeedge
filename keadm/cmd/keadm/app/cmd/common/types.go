@@ -49,6 +49,9 @@ type GettokenOptions struct {
 	Kubeconfig string
 }
 
+type DiagnoseOptions struct {
+}
+
 //InstallState enum set used for verifying a tool version is installed in host
 type InstallState uint8
 
