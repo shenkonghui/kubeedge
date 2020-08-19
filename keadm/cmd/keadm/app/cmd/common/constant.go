@@ -119,6 +119,40 @@ const (
 	KB int = 1024
 	MB int = KB * 1024
 	GB int = MB * 1024
+
+	EdgecoreConfig = "config"
+
+	// Default edgecore config path
+	EdgecoreConfigPath = "/etc/kubeedge/config/edgecore.yaml"
+
+	// cmd to copy file
+	CmdCopyFile = "cp -r %s %s/"
+
+	/*system info*/
+	CmdDiskInfo    = "df -h > %s/disk"
+	CmdArchInfo    = "arch > %s/arch"
+	CmdProcessInfo = "ps -axu > %s/process"
+	CmdDateInfo    = "date > %s/date"
+	CmdUptimeInfo  = "uptime > %s/uptime"
+	CmdHistorynfo  = "history -a && cat ~/.bash_history  > %s/history"
+	CmdNetworkInfo = "netstat -pan > %s/network"
+
+	PathCpuinfo   = "/proc/cpuinfo"
+	PathMemory    = "/proc/meminfo"
+	PathHosts     = "/etc/hosts"
+	PathDNSResolv = "/etc/resolv.conf"
+
+	/*edgecore info*/
+	PathEdgecoreService = "/lib/systemd/system/edgecore.service"
+	CmdEdgecoreVersion  = "edgecore  --version > %s/version"
+
+	/*runtime info*/
+	CmdDockerVersion    = "docker version > %s/version"
+	CmdContainerInfo    = "docker ps -a > %s/containerInfo"
+	CmdContainerLogInfo = "journalctl -u docker  > %s/log"
+	CmdDockerInfo       = "docker info > %s/info"
+	CmdDockerImageInfo  = "docker images > %s/images"
+	PathDockerService   = "/lib/systemd/system/docker.service"
 )
 
 var (

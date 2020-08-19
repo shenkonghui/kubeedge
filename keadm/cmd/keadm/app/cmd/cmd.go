@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cloud "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/cloud"
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/debug"
 	edge "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/edge"
 )
 
