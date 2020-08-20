@@ -14,8 +14,9 @@ limitations under the License.
 package debug
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -32,7 +33,7 @@ func NewEdgeDebug(out io.Writer) *cobra.Command {
 		Long:  edgeDebugLongDescription,
 	}
 	// add subCommand collect
-	cmd.AddCommand(NewEdgeCollect(out, nil))
+	cmd.AddCommand(NewDiagnose(out, nil))
 
 	return cmd
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/debug"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -73,6 +74,7 @@ func NewKubeedgeCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewKubeEdgeReset(out, nil))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(cloud.NewGettoken(out, nil))
+	cmds.AddCommand(debug.NewEdgeDebug(out))
 
 	return cmds
 }

@@ -52,6 +52,11 @@ type GettokenOptions struct {
 type DiagnoseOptions struct {
 }
 
+type DiagnoseObject struct {
+	Desc string
+	Use  string
+}
+
 //InstallState enum set used for verifying a tool version is installed in host
 type InstallState uint8
 

@@ -73,4 +73,40 @@ const (
 	TokenSecretName = "tokensecret"
 
 	TokenDataName = "tokendata"
+
+	/**Diagnose**/
+	ArgDiagnoseAll  = "all"
+	DescDiagnoseAll = "Diagnose all iteams"
+
+	ArgDiagnoseNode  = "node"
+	DescDiagnoseNode = "Diagnose edge node"
+
+	ArgDiagnosePod  = "pod"
+	DescDiagnosePod = "Diagnose pod"
+
+	ArgDiagnoseInstall  = "install"
+	DescDiagnoseInstall = "Diagnose install"
+	/****/
+
+)
+
+var (
+	DiagnoseObjectMap = []DiagnoseObject{
+		{
+			Use:  ArgDiagnoseAll,
+			Desc: DescDiagnoseAll,
+		},
+		{
+			Use:  ArgDiagnoseNode,
+			Desc: DescDiagnoseNode,
+		},
+		{
+			Use:  ArgDiagnosePod,
+			Desc: DescDiagnosePod,
+		},
+		{
+			Use:  ArgDiagnoseInstall,
+			Desc: DescDiagnoseInstall,
+		},
+	}
 )

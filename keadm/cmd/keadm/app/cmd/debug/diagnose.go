@@ -1,7 +1,7 @@
 package debug
 
 import (
-	"fmt"
+	constant "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	types "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	"github.com/spf13/cobra"
 	"io"
@@ -19,8 +19,10 @@ keadm debug collect --path .
 `
 )
 
+type Diagnose types.DiagnoseObject
+
 // NewEdgeCollect returns KubeEdge edge debug collect command.
-func NewEdgeCollect(out io.Writer, diagnoseOptions *types.DiagnoseOptions) *cobra.Command {
+func NewDiagnose(out io.Writer, diagnoseOptions *types.DiagnoseOptions) *cobra.Command {
 	if diagnoseOptions == nil {
 		diagnoseOptions = newDiagnoseOptions()
 	}
@@ -29,11 +31,10 @@ func NewEdgeCollect(out io.Writer, diagnoseOptions *types.DiagnoseOptions) *cobr
 		Short:   edgeDiagnoseShortDescription,
 		Long:    edgeDiagnoseLongDescription,
 		Example: edgeDiagnoseExample,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return ExecuteDiagnose()
-		},
 	}
-
+	for _, v := range constant.DiagnoseObjectMap {
+		cmd.AddCommand(NewSubDiagnose(out, Diagnose(v)))
+	}
 	//addCollectOtherFlags(cmd, collectOptions)
 	return cmd
 }
@@ -46,6 +47,38 @@ func newDiagnoseOptions() *types.DiagnoseOptions {
 
 //Start to collect data
 func ExecuteDiagnose() error {
-	fmt.Println("Start collecting data")
 	return nil
+}
+
+func NewSubDiagnose(out io.Writer, object Diagnose) *cobra.Command {
+	co := NewDiagnoseOptins()
+	cmd := &cobra.Command{
+		Short: object.Desc,
+		Use:   object.Use,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return object.ExecuteDiagnose(object.Use, co)
+		},
+	}
+	switch object.Use {
+
+	}
+	return cmd
+}
+
+// add flags
+func NewDiagnoseOptins() *types.DiagnoseOptions {
+	do := &types.DiagnoseOptions{}
+	return do
+}
+
+func (da Diagnose) ExecuteDiagnose(use string, ops *types.DiagnoseOptions) error {
+	switch use {
+	case constant.ArgDiagnoseNode:
+		DiagnoseNode()
+	}
+	return nil
+}
+
+func DiagnoseNode() {
+
 }

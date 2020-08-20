@@ -482,3 +482,15 @@ func isKubeEdgeProcessRunning(proc string) (bool, error) {
 
 	return false, nil
 }
+
+// Execute shell script and filter
+func ExecShellFilter(c string) (string, error) {
+	cmd := exec.Command("sh", "-c", c)
+	o, err := cmd.Output()
+	str := strings.Replace(string(o), " ", "", -1)
+	str = strings.Replace(str, "\n", "", -1)
+	if err != nil {
+		return str, fmt.Errorf("exec fail: %s, %s", c, err)
+	}
+	return str, nil
+}
