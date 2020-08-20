@@ -6,14 +6,13 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	constant "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	types "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -99,7 +98,7 @@ func NewSubEdgeCheck(out io.Writer, object CheckObject) *cobra.Command {
 // add flags
 func NewCheckOptins() *types.CheckOptions {
 	co := &types.CheckOptions{}
-	co.Runtime = "docker"
+	co.Runtime = types.DefaultRuntime
 	co.Domain = "www.github.com"
 	co.Timeout = 1
 	return co
@@ -131,9 +130,9 @@ func (co *CheckObject) ExecuteCheck(use string, ob *types.CheckOptions) error {
 	}
 
 	if err != nil {
-		checkFail(use)
+		util.PrintFail(use, constant.StrCheck)
 	} else {
-		checkSuccedd(use)
+		util.PrintSuccedd(use, constant.StrCheck)
 	}
 
 	return err
@@ -183,8 +182,8 @@ func CheckAll(ob *types.CheckOptions) error {
 }
 
 func CheckArch() error {
-	o, err := execShellFilter(constant.CmdGetArch)
-	if !IsContain(constant.AllowedValueArch, string(o)) {
+	o, err := util.ExecShellFilter(constant.CmdGetArch)
+	if !util.IsContain(constant.AllowedValueArch, string(o)) {
 		return fmt.Errorf("arch not support: %s", string(o))
 	}
 	fmt.Printf("arch is : %s\n", string(o))
@@ -192,15 +191,15 @@ func CheckArch() error {
 }
 
 func CheckCPU() error {
-	return ComparisonSize(constant.CmdGetCPUNum, constant.AllowedValueCPU, constant.ArgCheckCPU, constant.UnitCore)
+	return util.ComparisonSizeWithCmd(constant.CmdGetCPUNum, constant.AllowedValueCPU, constant.ArgCheckCPU, util.UnitCore)
 }
 
 func CheckMemory() error {
-	return ComparisonSize(constant.CmdGetMenorySize, constant.AllowedValueMemory, constant.ArgCheckMemory, constant.UnitMB)
+	return util.ComparisonSizeWithCmd(constant.CmdGetMenorySize, constant.AllowedValueMemory, constant.ArgCheckMemory, util.UnitMB)
 }
 
 func CheckDisk() error {
-	return ComparisonSize(constant.CmdGetDiskSize, constant.AllowedValueDisk, constant.ArgCheckDisk, constant.UnitGB)
+	return util.ComparisonSizeWithCmd(constant.CmdGetDiskSize, constant.AllowedValueDisk, constant.ArgCheckDisk, util.UnitGB)
 }
 
 func CheckDNS(domain string) error {
@@ -218,7 +217,7 @@ func CheckDNS(domain string) error {
 
 func CheckNetWork(IP string, timeout int, edgeHubURL string) error {
 	if IP == "" && edgeHubURL == "" {
-		result, err := execShellFilter(constant.CmdGetDNSIP)
+		result, err := util.ExecShellFilter(constant.CmdGetDNSIP)
 		if err != nil {
 			return err
 		}
@@ -231,7 +230,7 @@ func CheckNetWork(IP string, timeout int, edgeHubURL string) error {
 		}
 	}
 	if IP != "" {
-		result, err := execShellFilter(fmt.Sprintf(constant.CmdPing, IP, timeout))
+		result, err := util.ExecShellFilter(fmt.Sprintf(constant.CmdPing, IP, timeout))
 
 		if err != nil {
 			return err
@@ -261,8 +260,8 @@ func CheckHTTP(url string) error {
 }
 
 func CheckRuntime(runtime string) error {
-	if runtime == "docker" {
-		result, err := execShellFilter(constant.CmdGetStatusDocker)
+	if runtime == types.DefaultRuntime {
+		result, err := util.ExecShellFilter(constant.CmdGetStatusDocker)
 		if err != nil {
 			return err
 		}
@@ -278,11 +277,11 @@ func CheckRuntime(runtime string) error {
 }
 
 func CheckPid() error {
-	rMax, err := execShellFilter(constant.CmdGetMaxProcessNum)
+	rMax, err := util.ExecShellFilter(constant.CmdGetMaxProcessNum)
 	if err != nil {
 		return err
 	}
-	r, err := execShellFilter(constant.CmdGetProcessNum)
+	r, err := util.ExecShellFilter(constant.CmdGetProcessNum)
 	if err != nil {
 		return err
 	}
@@ -294,113 +293,4 @@ func CheckPid() error {
 		return nil
 	}
 	return fmt.Errorf("Maximum PIDs: %s; Running processes: %s", rMax, r)
-}
-
-/**
-Execute command and compare size
-c:       cmd
-require: Minimum resource requirement
-name：   the name  of check item
-unit:    resourceUnit, e.g. MB，GB
-*/
-func ComparisonSize(c string, require string, name string, unit string) error {
-	result, err := execShellFilter(c)
-	if err != nil {
-		return fmt.Errorf("exec \"%s\" fail: %s", c, err.Error())
-	}
-	if len(result) == 0 {
-		return fmt.Errorf("exec \"%s\" fail", c)
-	}
-	resultInt, err := ConverData(result)
-	if err != nil {
-		return fmt.Errorf("conver %s fail: %s", result, err.Error())
-	}
-	requireInt, err := ConverData(require)
-	if err != nil {
-		return fmt.Errorf("conver %s fail: %s", require, err)
-	}
-
-	if resultInt < requireInt {
-		return fmt.Errorf("%s requirements: %s, current value: %s", name, require, result)
-	}
-	fmt.Printf("%s requirements: %s, current value: %s\n", name, require, result)
-
-	return nil
-}
-
-// Execute shell script and filter
-func execShellFilter(c string) (string, error) {
-	cmd := exec.Command("sh", "-c", c)
-	o, err := cmd.Output()
-	str := strings.Replace(string(o), " ", "", -1)
-	str = strings.Replace(str, "\n", "", -1)
-	if err != nil {
-		return str, fmt.Errorf("exec fail: %s, %s", c, err)
-	}
-	return str, nil
-}
-
-// Determine if it is in the array
-func IsContain(items []string, item string) bool {
-	for _, eachItem := range items {
-		if eachItem == item {
-			return true
-		}
-	}
-	return false
-}
-
-/**
-Convert data string to int type
-input: data, for example: 1GB、1G、1MB、1024k、1024
-*/
-func ConverData(input string) (int, error) {
-	// If it is a number, just return
-	v, err := strconv.Atoi(input)
-	if err == nil {
-		return v, nil
-	}
-
-	re, err := regexp.Compile(`([0-9]+)([a-zA-z]+)`)
-	if err != nil {
-		return 0, err
-	}
-	result := re.FindStringSubmatch(input)
-	if len(result) != 3 {
-		return 0, fmt.Errorf("regexp err")
-	}
-	v, err = strconv.Atoi(result[1])
-	if err != nil {
-		return 0, err
-	}
-	unit := strings.ToUpper(result[2])
-	unit = unit[:1]
-
-	switch unit {
-	case "G":
-		v = v * constant.GB
-	case "M":
-		v = v * constant.MB
-	case "K":
-		v = v * constant.KB
-	default:
-		return 0, fmt.Errorf("unit err")
-	}
-	return v, nil
-}
-
-//print fail
-func checkFail(s string) {
-	s = s + " check failed."
-	fmt.Println("\n+-------------------+")
-	fmt.Printf("|%s|\n", s)
-	fmt.Println("+-------------------+")
-}
-
-//print success
-func checkSuccedd(s string) {
-	s = s + " check succeed."
-	fmt.Println("\n+-------------------+")
-	fmt.Printf("|%s|\n", s)
-	fmt.Println("+-------------------+")
 }

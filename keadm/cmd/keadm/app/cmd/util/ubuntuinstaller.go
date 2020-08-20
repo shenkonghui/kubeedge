@@ -108,3 +108,7 @@ func getSystemArch() (string, error) {
 	}
 	return arch, nil
 }
+
+func (u *UbuntuOS) IsProcessRunning(proc string) (bool, error) {
+	return isKubeEdgeProcessRunning(proc)
+}

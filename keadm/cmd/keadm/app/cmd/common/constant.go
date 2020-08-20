@@ -74,6 +74,9 @@ const (
 
 	TokenDataName = "tokendata"
 
+	StrCheck    = "check"
+	StrDiagnose = "diagnose"
+
 	ArgCheckAll     = "all"
 	ArgCheckArch    = "arch"
 	ArgCheckCPU     = "cpu"
@@ -111,14 +114,6 @@ const (
 	AllowedValuePIDRate = 0.05
 
 	DefaultDomain = "www.github.com"
-
-	UnitCore = "core"
-	UnitMB   = "MB"
-	UnitGB   = "GB"
-
-	KB int = 1024
-	MB int = KB * 1024
-	GB int = MB * 1024
 
 	EdgecoreConfig = "config"
 
@@ -170,11 +165,10 @@ const (
 	DescDiagnoseInstall = "Diagnose install"
 	/*****************/
 
+	DefaultRuntime = "docker"
 )
 
 var (
-
-	/**Check**/
 	AllowedValueArch = []string{"amd64", "arm64v8", "arm32v7", "i386", "s390x", "x86_64", "aarch64"}
 
 	CheckObjectMap = []CheckObject{
@@ -215,14 +209,8 @@ var (
 			Desc: DescPID,
 		},
 	}
-	/****/
 
-	/**Diagnose**/
 	DiagnoseObjectMap = []DiagnoseObject{
-		{
-			Use:  ArgDiagnoseAll,
-			Desc: DescDiagnoseAll,
-		},
 		{
 			Use:  ArgDiagnoseNode,
 			Desc: DescDiagnoseNode,
@@ -236,5 +224,4 @@ var (
 			Desc: DescDiagnoseInstall,
 		},
 	}
-	/****/
 )

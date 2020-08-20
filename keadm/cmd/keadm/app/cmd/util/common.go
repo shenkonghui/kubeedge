@@ -75,6 +75,14 @@ const (
 
 	latestReleaseVersionURL = "https://api.github.com/repos/kubeedge/kubeedge/releases/latest"
 	RetryTimes              = 5
+
+	UnitCore = "core"
+	UnitMB   = "MB"
+	UnitGB   = "GB"
+
+	KB int = 1024
+	MB int = KB * 1024
+	GB int = MB * 1024
 )
 
 type latestReleaseVersion struct {
@@ -488,18 +496,6 @@ func isKubeEdgeProcessRunning(proc string) (bool, error) {
 	return false, nil
 }
 
-// Execute shell script and filter
-func ExecShellFilter(c string) (string, error) {
-	cmd := exec.Command("sh", "-c", c)
-	o, err := cmd.Output()
-	str := strings.Replace(string(o), " ", "", -1)
-	str = strings.Replace(str, "\n", "", -1)
-	if err != nil {
-		return str, fmt.Errorf("exec fail: %s, %s", c, err)
-	}
-	return str, nil
-}
-
 // Compressed folders or files
 func Compress(tarName string, paths []string) (err error) {
 	tarFile, err := os.Create(tarName)
@@ -606,5 +602,125 @@ func ParseEdgecoreConfig(edgecorePath string) (*v1alpha1.EdgeCoreConfig, error) 
 		return nil, err
 	}
 	return edgeCoreConfig, nil
+}
 
+/**
+Execute command and compare size
+c:       cmd
+require: Minimum resource requirement
+name：   the name  of check item
+unit:    resourceUnit, e.g. MB，GB
+*/
+func ComparisonSizeWithCmd(c string, require string, name string, unit string) error {
+	result, err := ExecShellFilter(c)
+	if err != nil {
+		return fmt.Errorf("exec \"%s\" fail: %s", c, err.Error())
+	}
+	if len(result) == 0 {
+		return fmt.Errorf("exec \"%s\" fail", c)
+	}
+	resultInt, err := ConverData(result)
+	if err != nil {
+		return fmt.Errorf("conver %s fail: %s", result, err.Error())
+	}
+	requireInt, err := ConverData(require)
+	if err != nil {
+		return fmt.Errorf("conver %s fail: %s", require, err)
+	}
+
+	if resultInt < requireInt {
+		return fmt.Errorf("%s requirements: %s, current value: %s", name, require, result)
+	}
+	fmt.Printf("%s requirements: %s, current value: %s\n", name, require, result)
+
+	return nil
+}
+
+// Execute shell script and filter
+func ExecShellFilter(c string) (string, error) {
+	cmd := exec.Command("sh", "-c", c)
+	o, err := cmd.Output()
+	str := strings.Replace(string(o), " ", "", -1)
+	str = strings.Replace(str, "\n", "", -1)
+	if err != nil {
+		return str, fmt.Errorf("exec fail: %s, %s", c, err)
+	}
+	return str, nil
+}
+
+// Determine if it is in the array
+func IsContain(items []string, item string) bool {
+	for _, eachItem := range items {
+		if eachItem == item {
+			return true
+		}
+	}
+	return false
+}
+
+/**
+Convert data string to int type
+input: data, for example: 1GB、1G、1MB、1024k、1024
+*/
+func ConverData(input string) (int, error) {
+	// If it is a number, just return
+	v, err := strconv.Atoi(input)
+	if err == nil {
+		return v, nil
+	}
+
+	re, err := regexp.Compile(`([0-9]+)([a-zA-z]+)`)
+	if err != nil {
+		return 0, err
+	}
+	result := re.FindStringSubmatch(input)
+	if len(result) != 3 {
+		return 0, fmt.Errorf("regexp err")
+	}
+	v, err = strconv.Atoi(result[1])
+	if err != nil {
+		return 0, err
+	}
+	unit := strings.ToUpper(result[2])
+	unit = unit[:1]
+
+	switch unit {
+	case "G":
+		v = v * GB
+	case "M":
+		v = v * MB
+	case "K":
+		v = v * KB
+	default:
+		return 0, fmt.Errorf("unit err")
+	}
+	return v, nil
+}
+
+//print fail
+func PrintFail(cmd string, s string) {
+	fmt.Println("\n+-------------------+")
+	fmt.Printf("|%s %s failed|\n", s, cmd)
+	fmt.Println("+-------------------+")
+}
+
+//print success
+func PrintSuccedd(cmd string, s string) {
+	fmt.Println("\n+-------------------+")
+	fmt.Printf("|%s %s succeed.|\n", s, cmd)
+	fmt.Println("+-------------------+")
+}
+
+//IsKubeEdgeProcessRunning checks if the given process is running or not
+func IsProcessRunningWithFilter(proc string, filter string) (bool, error) {
+	procRunning := fmt.Sprintf("ps aux | grep '[%s]%s'|grep -v '%s' | awk '{print $2}'", proc[0:1], proc[1:], filter)
+	stdout, err := runCommandWithStdout(procRunning)
+	if err != nil {
+		return false, err
+	}
+	if stdout != "" {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -72,6 +72,9 @@ type GettokenOptions struct {
 }
 
 type DiagnoseOptions struct {
+	Pod          string
+	Namespace    string
+	CheckOptions *CheckOptions
 }
 
 type DiagnoseObject struct {
@@ -123,6 +126,7 @@ type OSTypeInstaller interface {
 	RunEdgeCore() error
 	KillKubeEdgeBinary(string) error
 	IsKubeEdgeProcessRunning(string) (bool, error)
+	IsProcessRunning(string) (bool, error)
 }
 
 //FlagData stores value and default value of the flags used in this command
