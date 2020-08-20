@@ -74,7 +74,89 @@ const (
 
 	TokenDataName = "tokendata"
 
-	/**Diagnose**/
+	ArgCheckAll     = "all"
+	ArgCheckArch    = "arch"
+	ArgCheckCPU     = "cpu"
+	ArgCheckMemory  = "mem"
+	ArgCheckDisk    = "disk"
+	ArgCheckDNS     = "dns"
+	ArgCheckRuntime = "runtime"
+	ArgCheckNetwork = "network"
+	ArgCheckPID     = "pid"
+
+	DescAll     = "Check all item"
+	DescArch    = "Check whether the architecture can work"
+	DescCPU     = "Check node CPU requirements"
+	DescMemory  = "Check node memory requirements"
+	Descdisk    = "Check node disk requirements"
+	DescDNS     = "Check whether DNS can work"
+	DescRuntime = "Check whether runtime can work"
+	DescNetwork = "Check whether the network is normal"
+	DescPID     = "Check node PID requirements"
+
+	CmdGetArch       = "arch"
+	CmdGetCPUNum     = "cat /proc/cpuinfo  |grep processor| wc -l"
+	CmdGetMenorySize = "free -h |grep Mem|awk '{print $2}'"
+	// Use regular expressions to filter the ones that are not empty after "/"
+	CmdGetDiskSize      = "df -h |grep -ve \" /.\"|sed -n \"2p\"|awk '{print $2}'"
+	CmdGetDNSIP         = "cat /etc/resolv.conf |grep nameserver|grep -v ':'|awk '{print $2}'|sed -n '1p'"
+	CmdGetStatusDocker  = "systemctl status docker |grep Active | awk '{print $2}'"
+	CmdPing             = "ping %s -w %d |grep 'packets transmitted' |awk '{print $4}'"
+	CmdGetMaxProcessNum = "sysctl kernel.pid_max|awk '{print $3}'"
+	CmdGetProcessNum    = "ps -A|wc -l"
+
+	AllowedValueCPU     = "1"
+	AllowedValueMemory  = "256MB"
+	AllowedValueDisk    = "1GB"
+	AllowedValuePIDRate = 0.05
+
+	DefaultDomain = "www.github.com"
+
+	UnitCore = "core"
+	UnitMB   = "MB"
+	UnitGB   = "GB"
+
+	KB int = 1024
+	MB int = KB * 1024
+	GB int = MB * 1024
+
+	EdgecoreConfig = "config"
+
+	// Default edgecore config path
+	EdgecoreConfigPath = "/etc/kubeedge/config/edgecore.yaml"
+
+	// cmd to copy file
+	CmdCopyFile = "cp -r %s %s/"
+
+	/****Collect****/
+	/*system info*/
+	CmdDiskInfo    = "df -h > %s/disk"
+	CmdArchInfo    = "arch > %s/arch"
+	CmdProcessInfo = "ps -axu > %s/process"
+	CmdDateInfo    = "date > %s/date"
+	CmdUptimeInfo  = "uptime > %s/uptime"
+	CmdHistorynfo  = "history -a && cat ~/.bash_history  > %s/history"
+	CmdNetworkInfo = "netstat -pan > %s/network"
+
+	PathCpuinfo   = "/proc/cpuinfo"
+	PathMemory    = "/proc/meminfo"
+	PathHosts     = "/etc/hosts"
+	PathDNSResolv = "/etc/resolv.conf"
+
+	/*edgecore info*/
+	PathEdgecoreService = "/lib/systemd/system/edgecore.service"
+	CmdEdgecoreVersion  = "edgecore  --version > %s/version"
+
+	/*runtime info*/
+	CmdDockerVersion    = "docker version > %s/version"
+	CmdContainerInfo    = "docker ps -a > %s/containerInfo"
+	CmdContainerLogInfo = "journalctl -u docker  > %s/log"
+	CmdDockerInfo       = "docker info > %s/info"
+	CmdDockerImageInfo  = "docker images > %s/images"
+	PathDockerService   = "/lib/systemd/system/docker.service"
+	/*****************/
+
+	/****Diagnose****/
 	ArgDiagnoseAll  = "all"
 	DescDiagnoseAll = "Diagnose all iteams"
 
@@ -86,11 +168,56 @@ const (
 
 	ArgDiagnoseInstall  = "install"
 	DescDiagnoseInstall = "Diagnose install"
-	/****/
+	/*****************/
 
 )
 
 var (
+
+	/**Check**/
+	AllowedValueArch = []string{"amd64", "arm64v8", "arm32v7", "i386", "s390x", "x86_64", "aarch64"}
+
+	CheckObjectMap = []CheckObject{
+		{
+			Use:  ArgCheckAll,
+			Desc: DescAll,
+		},
+		{
+			Use:  ArgCheckArch,
+			Desc: DescArch,
+		},
+		{
+			Use:  ArgCheckCPU,
+			Desc: DescCPU,
+		},
+		{
+			Use:  ArgCheckMemory,
+			Desc: DescMemory,
+		},
+		{
+			Use:  ArgCheckDisk,
+			Desc: Descdisk,
+		},
+		{
+			Use:  ArgCheckDNS,
+			Desc: DescDNS,
+		},
+		{
+			Use:  ArgCheckRuntime,
+			Desc: DescRuntime,
+		},
+		{
+			Use:  ArgCheckNetwork,
+			Desc: DescNetwork,
+		},
+		{
+			Use:  ArgCheckPID,
+			Desc: DescPID,
+		},
+	}
+	/****/
+
+	/**Diagnose**/
 	DiagnoseObjectMap = []DiagnoseObject{
 		{
 			Use:  ArgDiagnoseAll,
@@ -109,4 +236,5 @@ var (
 			Desc: DescDiagnoseInstall,
 		},
 	}
+	/****/
 )

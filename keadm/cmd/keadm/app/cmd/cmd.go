@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/debug"
 	"io"
 
 	"github.com/spf13/cobra"
 
 	cloud "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/cloud"
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/debug"
 	edge "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/edge"
 )
 

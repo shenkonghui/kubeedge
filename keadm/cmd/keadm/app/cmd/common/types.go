@@ -41,6 +41,28 @@ type JoinOptions struct {
 	CertPort              string
 }
 
+type CheckOptions struct {
+	Domain     string
+	IP         string
+	Runtime    string
+	Timeout    int
+	EdgeHubURL string
+}
+
+type CheckObject struct {
+	Use  string
+	Desc string
+	Cmd  string
+}
+
+//ColletcOptions has the kubeedge debug colletc information filled by CLI
+type ColletcOptions struct {
+	Config     string
+	OutputPath string
+	Detail     bool
+	LogPath    string
+}
+
 type ResetOptions struct {
 	Kubeconfig string
 }
