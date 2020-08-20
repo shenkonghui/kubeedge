@@ -53,7 +53,8 @@ type CheckObject struct {
 	Use  string
 	Desc string
 	Cmd  string
-	
+}
+
 //ColletcOptions has the kubeedge debug colletc information filled by CLI
 type ColletcOptions struct {
 	Config     string

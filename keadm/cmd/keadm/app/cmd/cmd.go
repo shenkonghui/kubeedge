@@ -19,8 +19,6 @@ package cmd
 import (
 	"io"
 
-	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/debug"
-
 	"github.com/spf13/cobra"
 
 	cloud "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/cloud"
