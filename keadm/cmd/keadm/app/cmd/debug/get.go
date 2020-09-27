@@ -14,12 +14,18 @@ limitations under the License.
 package debug
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"strings"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
 
 	"github.com/kubeedge/beehive/pkg/core/model"
 	"github.com/kubeedge/kubeedge/common/constants"
+	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
 	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 )
 
@@ -78,7 +84,12 @@ func NewCmdDebugGet(out io.Writer, getOption *GetOptions) *cobra.Command {
 		Long:    debugGetLong,
 		Example: debugGetExample,
 		Run: func(cmd *cobra.Command, args []string) {
-
+			if err := getOption.Validate(args); err != nil {
+				CheckErr(err, fatal)
+			}
+			if err := getOption.Run(args, out); err != nil {
+				CheckErr(err, fatal)
+			}
 		},
 	}
 	addGetOtherFlags(cmd, getOption)
@@ -86,14 +97,28 @@ func NewCmdDebugGet(out io.Writer, getOption *GetOptions) *cobra.Command {
 	return cmd
 }
 
-// GetOptions contains the input to the get command.
-type GetOptions struct {
-	AllNamespace  bool
-	Namespace     string
-	LabelSelector string
-	DataPath      string
+// fatal prints the message if set and then exits.
+func fatal(msg string, code int) {
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
 
-	PrintFlags *PrintFlags
+		fmt.Fprint(os.Stderr, msg)
+	}
+	os.Exit(code)
+}
+
+// CheckErr formats a given error as a string and calls the passed handleErr
+// func with that string and an exit code.
+func CheckErr(err error, handleErr func(string, int)) {
+	switch err.(type) {
+	case nil:
+		return
+	default:
+		handleErr(err.Error(), DefaultErrorExitCode)
+	}
 }
 
 // addGetOtherFlags
@@ -114,4 +139,98 @@ func NewGetOptions() *GetOptions {
 	}
 
 	return opts
+}
+
+// GetOptions contains the input to the get command.
+type GetOptions struct {
+	AllNamespace  bool
+	Namespace     string
+	LabelSelector string
+	DataPath      string
+
+	PrintFlags *PrintFlags
+}
+
+// Run performs the get operation.
+func (g *GetOptions) Run(args []string, out io.Writer) error {
+
+	return nil
+}
+
+// IsAllowedFormat verification support format
+func (g *GetOptions) IsAllowedFormat(f string) bool {
+	allowedFormats := g.PrintFlags.AllowedFormats()
+	for _, v := range allowedFormats {
+		if f == v {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Validate checks the set of flags provided by the user.
+func (g *GetOptions) Validate(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("You must specify the type of resource to get. ")
+	}
+	if !IsAvailableResources(args[0]) {
+		return fmt.Errorf("Unrecognized resource type: %v. ", args[0])
+	}
+	if len(g.DataPath) == 0 {
+		fmt.Printf("Not specified the EdgeCore database path, use the default path: %v. ", g.DataPath)
+	}
+	if !IsFileExist(g.DataPath) {
+		return fmt.Errorf("EdgeCore database file %v not exist. ", g.DataPath)
+	}
+
+	if err := InitDB(edgecoreCfg.DataBaseDriverName, edgecoreCfg.DataBaseAliasName, g.DataPath); err != nil {
+		return fmt.Errorf("Failed to initialize database: %v ", err)
+	}
+	if len(*g.PrintFlags.OutputFormat) > 0 {
+		format := strings.ToLower(*g.PrintFlags.OutputFormat)
+		g.PrintFlags.OutputFormat = &format
+		if !g.IsAllowedFormat(*g.PrintFlags.OutputFormat) {
+			return fmt.Errorf("Invalid output format: %v, currently supports formats such as yaml|json|wide. ", *g.PrintFlags.OutputFormat)
+		}
+	}
+	if args[0] == ResourceTypeAll && len(args) >= 2 {
+		return fmt.Errorf("You must specify only one resource. ")
+	}
+
+	return nil
+}
+
+// IsAvailableResources verification support resource type
+func IsAvailableResources(rsT string) bool {
+	_, ok := availableResources[rsT]
+	return ok
+}
+
+// IsFileExist check file is exist
+func IsFileExist(path string) bool {
+	_, err := os.Stat(path)
+
+	return err == nil || !os.IsNotExist(err)
+}
+
+// InitDB Init DB info
+func InitDB(driverName, dbName, dataSource string) error {
+	if err := orm.RegisterDriver(driverName, orm.DRSqlite); err != nil {
+		return fmt.Errorf("Failed to register driver: %v ", err)
+	}
+	if err := orm.RegisterDataBase(
+		dbName,
+		driverName,
+		dataSource); err != nil {
+		return fmt.Errorf("Failed to register db: %v ", err)
+	}
+	orm.RegisterModel(new(dao.Meta))
+
+	// create orm
+	dbm.DBAccess = orm.NewOrm()
+	if err := dbm.DBAccess.Using(dbName); err != nil {
+		return fmt.Errorf("Using db access error %v ", err)
+	}
+	return nil
 }
