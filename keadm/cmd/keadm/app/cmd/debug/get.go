@@ -14,6 +14,7 @@ limitations under the License.
 package debug
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/spf13/cobra"
 
+	"github.com/kubeedge/beehive/pkg/common/util"
 	"github.com/kubeedge/beehive/pkg/core/model"
 	"github.com/kubeedge/kubeedge/common/constants"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
@@ -153,7 +155,12 @@ type GetOptions struct {
 
 // Run performs the get operation.
 func (g *GetOptions) Run(args []string, out io.Writer) error {
-
+	resType := args[0]
+	resNames := args[1:]
+	_, err := g.queryDataFromDatabase(availableResources[resType], resNames)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -201,6 +208,169 @@ func (g *GetOptions) Validate(args []string) error {
 	return nil
 }
 
+func (g *GetOptions) queryDataFromDatabase(resType string, resNames []string) ([]dao.Meta, error) {
+	var result []dao.Meta
+
+	switch resType {
+	case model.ResourceTypePod:
+		pods, err := g.getPodsFromDatabase(g.Namespace, resNames)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, pods...)
+	case model.ResourceTypeNode:
+		node, err := g.getNodeFromDatabase(g.Namespace, resNames)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, node...)
+	case model.ResourceTypeConfigmap, model.ResourceTypeSecret, constants.ResourceTypeEndpoints, constants.ResourceTypeService:
+		value, err := g.getSingleResourceFromDatabase(g.Namespace, resNames, resType)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, value...)
+	case ResourceTypeAll:
+		pods, err := g.getPodsFromDatabase(g.Namespace, resNames)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, pods...)
+		node, err := g.getNodeFromDatabase(g.Namespace, resNames)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, node...)
+
+		resTypes := []string{model.ResourceTypeConfigmap, model.ResourceTypeSecret, constants.ResourceTypeEndpoints, constants.ResourceTypeService}
+		for _, v := range resTypes {
+			value, err := g.getSingleResourceFromDatabase(g.Namespace, resNames, v)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value...)
+		}
+	default:
+		return nil, fmt.Errorf("Query resource type: %v in namespaces: %v failed. ", resType, g.Namespace)
+
+	}
+
+	return result, nil
+}
+
+func (g *GetOptions) getPodsFromDatabase(resNS string, resNames []string) ([]dao.Meta, error) {
+	var results []dao.Meta
+	podJSON := make(map[string]interface{})
+	podStatusJSON := make(map[string]interface{})
+
+	podRecords, err := dao.QueryAllMeta("type", model.ResourceTypePod)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range *podRecords {
+		namespaceParsed, _, _, _ := util.ParseResourceEdge(v.Key, model.QueryOperation)
+		if namespaceParsed != resNS && !g.AllNamespace {
+			continue
+		}
+		if len(resNames) > 0 && !IsExistName(resNames, v.Key) {
+			continue
+		}
+
+		podKey := strings.Replace(v.Key, constants.ResourceSep+model.ResourceTypePod+constants.ResourceSep,
+			constants.ResourceSep+model.ResourceTypePodStatus+constants.ResourceSep, 1)
+		podStatusRecords, err := dao.QueryMeta("key", podKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(*podStatusRecords) <= 0 {
+			results = append(results, v)
+			continue
+		}
+		if err := json.Unmarshal([]byte(v.Value), &podJSON); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte((*podStatusRecords)[0]), &podStatusJSON); err != nil {
+			return nil, err
+		}
+		podJSON["status"] = podStatusJSON["Status"]
+		data, err := json.Marshal(podJSON)
+		if err != nil {
+			return nil, err
+		}
+		v.Value = string(data)
+		results = append(results, v)
+	}
+
+	return results, nil
+}
+
+func (g *GetOptions) getNodeFromDatabase(resNS string, resNames []string) ([]dao.Meta, error) {
+	var results []dao.Meta
+	nodeJSON := make(map[string]interface{})
+	nodeStatusJSON := make(map[string]interface{})
+
+	nodeRecords, err := dao.QueryAllMeta("type", model.ResourceTypeNode)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range *nodeRecords {
+		namespaceParsed, _, _, _ := util.ParseResourceEdge(v.Key, model.QueryOperation)
+		if namespaceParsed != resNS && !g.AllNamespace {
+			continue
+		}
+		if len(resNames) > 0 && !IsExistName(resNames, v.Key) {
+			continue
+		}
+
+		nodeKey := strings.Replace(v.Key, constants.ResourceSep+model.ResourceTypeNode+constants.ResourceSep,
+			constants.ResourceSep+model.ResourceTypeNodeStatus+constants.ResourceSep, 1)
+		nodeStatusRecords, err := dao.QueryMeta("key", nodeKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(*nodeStatusRecords) <= 0 {
+			results = append(results, v)
+			continue
+		}
+		if err := json.Unmarshal([]byte(v.Value), &nodeJSON); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte((*nodeStatusRecords)[0]), &nodeStatusJSON); err != nil {
+			return nil, err
+		}
+		nodeJSON["status"] = nodeStatusJSON["Status"]
+		data, err := json.Marshal(nodeJSON)
+		if err != nil {
+			return nil, err
+		}
+		v.Value = string(data)
+		results = append(results, v)
+	}
+
+	return results, nil
+}
+
+func (g *GetOptions) getSingleResourceFromDatabase(resNS string, resNames []string, resType string) ([]dao.Meta, error) {
+	var results []dao.Meta
+
+	resRecords, err := dao.QueryAllMeta("type", resType)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range *resRecords {
+		namespaceParsed, _, _, _ := util.ParseResourceEdge(v.Key, model.QueryOperation)
+		if namespaceParsed != resNS && !g.AllNamespace {
+			continue
+		}
+		if len(resNames) > 0 && !IsExistName(resNames, v.Key) {
+			continue
+		}
+		results = append(results, v)
+	}
+
+	return results, nil
+}
+
 // IsAvailableResources verification support resource type
 func IsAvailableResources(rsT string) bool {
 	_, ok := availableResources[rsT]
@@ -233,4 +403,16 @@ func InitDB(driverName, dbName, dataSource string) error {
 		return fmt.Errorf("Using db access error %v ", err)
 	}
 	return nil
+}
+
+// IsExistName verify the filed in the resNames exists in the name
+func IsExistName(resNames []string, name string) bool {
+	value := false
+	for _, v := range resNames {
+		if strings.Index(name, v) != -1 {
+			value = true
+		}
+	}
+
+	return value
 }
