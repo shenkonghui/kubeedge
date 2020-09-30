@@ -536,7 +536,7 @@ func SplitSelectorParameters(args string) ([]Selector, error) {
 
 // HumanReadablePrint Output data in table form
 func HumanReadablePrint(results []dao.Meta, printer printers.ResourcePrinter, out io.Writer) error {
-	podList, serviceList, secretList, configMapList, endPointsList, err := ParseMetaToAPIList(results)
+	podList, serviceList, secretList, configMapList, endPointsList, nodeList, err := ParseMetaToAPIList(results)
 	if err != nil {
 		return err
 	}
@@ -601,6 +601,18 @@ func HumanReadablePrint(results []dao.Meta, printer printers.ResourcePrinter, ou
 			return err
 		}
 	}
+	if len(nodeList.Items) != 0 {
+		talbe, err := ConvertDataToTable(nodeList)
+		if err != nil {
+			return err
+		}
+		if err := printer.PrintObj(talbe, out); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -608,12 +620,13 @@ func HumanReadablePrint(results []dao.Meta, printer printers.ResourcePrinter, ou
 // Only use this type definition to get the table header processing handle,
 // and automatically obtain the ColumnDefinitions of the table according to the type
 // Only used by HumanReadablePrint.
-func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *api.SecretList, *api.ConfigMapList, *api.EndpointsList, error) {
+func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *api.SecretList, *api.ConfigMapList, *api.EndpointsList, *api.NodeList, error) {
 	podList := &api.PodList{}
 	serviceList := &api.ServiceList{}
 	secretList := &api.SecretList{}
 	configMapList := &api.ConfigMapList{}
 	endPointsList := &api.EndpointsList{}
+	nodeList := &api.NodeList{}
 	value := make(map[string]interface{})
 
 	for _, v := range results {
@@ -622,28 +635,28 @@ func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *ap
 			pod := api.Pod{}
 
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			spec, err := json.Marshal(value["spec"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			status, err := json.Marshal(value["status"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &pod.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(spec, &pod.Spec); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(status, &pod.Status); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			pod.APIVersion = "v1"
 			pod.Kind = v.Type
@@ -652,28 +665,28 @@ func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *ap
 		case constants.ResourceTypeService:
 			svc := api.Service{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			spec, err := json.Marshal(value["spec"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			status, err := json.Marshal(value["status"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &svc.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(spec, &svc.Spec); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(status, &svc.Status); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			svc.APIVersion = "v1"
 			svc.Kind = v.Type
@@ -681,28 +694,28 @@ func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *ap
 		case model.ResourceTypeSecret:
 			secret := api.Secret{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			data, err := json.Marshal(value["data"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			typeTmp, err := json.Marshal(value["type"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &secret.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(data, &secret.Data); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(typeTmp, &secret.Type); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			secret.APIVersion = "v1"
 			secret.Kind = v.Type
@@ -710,21 +723,21 @@ func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *ap
 		case model.ResourceTypeConfigmap:
 			cmp := api.ConfigMap{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			data, err := json.Marshal(value["data"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &cmp.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(data, &cmp.Data); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			cmp.APIVersion = "v1"
 			cmp.Kind = v.Type
@@ -732,31 +745,60 @@ func ParseMetaToAPIList(results []dao.Meta) (*api.PodList, *api.ServiceList, *ap
 		case constants.ResourceTypeEndpoints:
 			ep := api.Endpoints{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			subsets, err := json.Marshal(value["subsets"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &ep.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(subsets, &ep.Subsets); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			ep.APIVersion = "v1"
 			ep.Kind = v.Type
 			endPointsList.Items = append(endPointsList.Items, ep)
+		case model.ResourceTypeNode:
+			nodes := api.Node{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			spec, err := json.Marshal(value["spec"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			status, err := json.Marshal(value["status"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &nodes.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(spec, &nodes.Spec); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(status, &nodes.Status); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			nodes.APIVersion = "v1"
+			nodes.Kind = v.Type
+			nodeList.Items = append(nodeList.Items, nodes)
 		default:
-			return nil, nil, nil, nil, nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
+			return nil, nil, nil, nil, nil, nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
 		}
 	}
 
-	return podList, serviceList, secretList, configMapList, endPointsList, nil
+	return podList, serviceList, secretList, configMapList, endPointsList, nodeList, nil
 }
 
 // ConvertDataToTable Convert the data into table kind to simulate the data sent by api-server
@@ -778,7 +820,7 @@ func JSONYamlPrint(results []dao.Meta, printer printers.ResourcePrinter, out io.
 		ListMeta: metav1.ListMeta{},
 	}
 
-	podList, serviceList, secretList, configMapList, endPointsList, err := ParseMetaToV1List(results)
+	podList, serviceList, secretList, configMapList, endPointsList, nodeList, err := ParseMetaToV1List(results)
 	if err != nil {
 		return err
 	}
@@ -903,6 +945,30 @@ func JSONYamlPrint(results []dao.Meta, printer printers.ResourcePrinter, out io.
 			return err
 		}
 	}
+	if len(nodeList.Items) != 0 {
+		if len(nodeList.Items) != 1 {
+			for _, info := range nodeList.Items {
+				o := info.DeepCopyObject()
+				list.Items = append(list.Items, runtime.RawExtension{Object: o})
+			}
+
+			listData, err := json.Marshal(list)
+			if err != nil {
+				return err
+			}
+
+			converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, listData)
+			if err != nil {
+				return err
+			}
+			obj = converted
+		} else {
+			obj = nodeList.Items[0].DeepCopyObject()
+		}
+		if err := PrintGeneric(printer, obj, out); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -910,12 +976,13 @@ func JSONYamlPrint(results []dao.Meta, printer printers.ResourcePrinter, out io.
 // The type definition used by apiserver does not have the omitempty definition of json, will introduce a lot of useless null information
 // Use v1 type definition to get data here
 // Only used by JSONYamlPrint.
-func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.SecretList, *v1.ConfigMapList, *v1.EndpointsList, error) {
+func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.SecretList, *v1.ConfigMapList, *v1.EndpointsList, *v1.NodeList, error) {
 	podList := &v1.PodList{}
 	serviceList := &v1.ServiceList{}
 	secretList := &v1.SecretList{}
 	configMapList := &v1.ConfigMapList{}
 	endPointsList := &v1.EndpointsList{}
+	nodeList := &v1.NodeList{}
 	value := make(map[string]interface{})
 
 	for _, v := range results {
@@ -924,28 +991,28 @@ func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.Se
 			pod := v1.Pod{}
 
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			spec, err := json.Marshal(value["spec"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			status, err := json.Marshal(value["status"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &pod.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(spec, &pod.Spec); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(status, &pod.Status); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			pod.APIVersion = "v1"
 			pod.Kind = v.Type
@@ -954,28 +1021,28 @@ func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.Se
 		case constants.ResourceTypeService:
 			svc := v1.Service{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			spec, err := json.Marshal(value["spec"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			status, err := json.Marshal(value["status"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &svc.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(spec, &svc.Spec); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(status, &svc.Status); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			svc.APIVersion = "v1"
 			svc.Kind = v.Type
@@ -983,28 +1050,28 @@ func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.Se
 		case model.ResourceTypeSecret:
 			secret := v1.Secret{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			data, err := json.Marshal(value["data"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			typeTmp, err := json.Marshal(value["type"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &secret.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(data, &secret.Data); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(typeTmp, &secret.Type); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			secret.APIVersion = "v1"
 			secret.Kind = v.Type
@@ -1012,21 +1079,21 @@ func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.Se
 		case model.ResourceTypeConfigmap:
 			cmp := v1.ConfigMap{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			data, err := json.Marshal(value["data"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &cmp.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(data, &cmp.Data); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			cmp.APIVersion = "v1"
 			cmp.Kind = v.Type
@@ -1034,31 +1101,60 @@ func ParseMetaToV1List(results []dao.Meta) (*v1.PodList, *v1.ServiceList, *v1.Se
 		case constants.ResourceTypeEndpoints:
 			ep := v1.Endpoints{}
 			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			metadata, err := json.Marshal(value["metadata"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			subsets, err := json.Marshal(value["subsets"])
 			if err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(metadata, &ep.ObjectMeta); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			if err := json.Unmarshal(subsets, &ep.Subsets); err != nil {
-				return nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, err
 			}
 			ep.APIVersion = "v1"
 			ep.Kind = v.Type
 			endPointsList.Items = append(endPointsList.Items, ep)
+		case model.ResourceTypeNode:
+			nodes := v1.Node{}
+			if err := json.Unmarshal([]byte(v.Value), &value); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			metadata, err := json.Marshal(value["metadata"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			spec, err := json.Marshal(value["spec"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			status, err := json.Marshal(value["status"])
+			if err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(metadata, &nodes.ObjectMeta); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(spec, &nodes.Spec); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			if err := json.Unmarshal(status, &nodes.Status); err != nil {
+				return nil, nil, nil, nil, nil, nil, err
+			}
+			nodes.APIVersion = "v1"
+			nodes.Kind = v.Type
+			nodeList.Items = append(nodeList.Items, nodes)
 		default:
-			return nil, nil, nil, nil, nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
+			return nil, nil, nil, nil, nil, nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
 		}
 	}
 
-	return podList, serviceList, secretList, configMapList, endPointsList, nil
+	return podList, serviceList, secretList, configMapList, endPointsList, nodeList, nil
 }
 
 // PrintGeneric Output object data to out stream through printer
