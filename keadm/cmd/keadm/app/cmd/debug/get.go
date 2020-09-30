@@ -157,10 +157,18 @@ type GetOptions struct {
 func (g *GetOptions) Run(args []string, out io.Writer) error {
 	resType := args[0]
 	resNames := args[1:]
-	_, err := g.queryDataFromDatabase(availableResources[resType], resNames)
+	results, err := g.queryDataFromDatabase(availableResources[resType], resNames)
 	if err != nil {
 		return err
 	}
+
+	if len(g.LabelSelector) > 0 {
+		results, err = FilterSelector(results, g.LabelSelector)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -371,6 +379,40 @@ func (g *GetOptions) getSingleResourceFromDatabase(resNS string, resNames []stri
 	return results, nil
 }
 
+func FilterSelector(data []dao.Meta, selector string) ([]dao.Meta, error) {
+	var results []dao.Meta
+	var jsonValue = make(map[string]interface{})
+
+	selectors, err := SplitSelectorParameters(selector)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range data {
+		err := json.Unmarshal([]byte(v.Value), &jsonValue)
+		if err != nil {
+			return nil, err
+		}
+		labels := jsonValue["metadata"].(map[string]interface{})["labels"]
+		if labels == nil {
+			results = append(results, v)
+			continue
+		}
+		flag := true
+		for _, v := range selectors {
+			if !v.Exist {
+				flag = flag && labels.(map[string]interface{})[v.Key] != v.Value
+				continue
+			}
+			flag = flag && (labels.(map[string]interface{})[v.Key] == v.Value)
+		}
+		if flag {
+			results = append(results, v)
+		}
+	}
+
+	return results, nil
+}
+
 // IsAvailableResources verification support resource type
 func IsAvailableResources(rsT string) bool {
 	_, ok := availableResources[rsT]
@@ -415,4 +457,53 @@ func IsExistName(resNames []string, name string) bool {
 	}
 
 	return value
+}
+
+// Selector filter structure
+type Selector struct {
+	Key   string
+	Value string
+	Exist bool
+}
+
+// SplitSelectorParameters Split selector args (flag: -l)
+func SplitSelectorParameters(args string) ([]Selector, error) {
+	var results = make([]Selector, 0)
+	var sel Selector
+	labels := strings.Split(args, ",")
+	for _, label := range labels {
+		if strings.Contains(label, "==") {
+			labs := strings.Split(label, "==")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("Arguments in selector form may not have more than one \"==\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = true
+			results = append(results, sel)
+			continue
+		}
+		if strings.Contains(label, "!=") {
+			labs := strings.Split(label, "!=")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("Arguments in selector form may not have more than one \"!=\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = false
+			results = append(results, sel)
+			continue
+		}
+		if strings.Contains(label, "=") {
+			labs := strings.Split(label, "=")
+			if len(labs) != 2 {
+				return nil, fmt.Errorf("Arguments in selector may not have more than one \"=\". ")
+			}
+			sel.Key = labs[0]
+			sel.Value = labs[1]
+			sel.Exist = true
+			results = append(results, sel)
+		}
+	}
+	return results, nil
 }
