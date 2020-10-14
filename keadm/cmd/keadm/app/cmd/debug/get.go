@@ -180,6 +180,10 @@ func (g *GetOptions) Run(args []string, out io.Writer) error {
 		}
 	}
 
+	if g.AllNamespace {
+		g.PrintFlags.EnsureWithNamespace()
+	}
+
 	printer, err := g.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
