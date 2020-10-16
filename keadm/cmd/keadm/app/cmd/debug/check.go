@@ -1,6 +1,8 @@
 package debug
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 
 	"io"
@@ -83,8 +85,10 @@ func NewSubEdgeCheck(out io.Writer, object CheckObject) *cobra.Command {
 		cmd.Flags().StringVarP(&co.IP, "ip", "i", co.IP, "specify test ip")
 		cmd.Flags().StringVarP(&co.EdgeHubURL, "edge-hub-url", "e", co.EdgeHubURL, "specify edgehub url,")
 		cmd.Flags().StringVarP(&co.Runtime, "runtime", "r", co.Runtime, "specify test runtime")
+		cmd.Flags().StringVarP(&co.DNSIP, "dns-ip", "D", co.DNSIP, "specify test dns ip")
 	case constant.ArgCheckDNS:
 		cmd.Flags().StringVarP(&co.Domain, "domain", "d", co.Domain, "specify test domain")
+		cmd.Flags().StringVarP(&co.DNSIP, "dns-ip", "D", co.DNSIP, "specify test dns ip")
 	case constant.ArgCheckNetwork:
 		cmd.Flags().StringVarP(&co.IP, "ip", "i", co.IP, "specify test ip")
 		cmd.Flags().StringVarP(&co.EdgeHubURL, "edge-hub-url", "e", co.EdgeHubURL, "specify edgehub url,")
@@ -120,7 +124,7 @@ func (co *CheckObject) ExecuteCheck(use string, ob *types.CheckOptions) error {
 	case constant.ArgCheckDisk:
 		err = CheckDisk()
 	case constant.ArgCheckDNS:
-		err = CheckDNS(ob.Domain)
+		err = CheckDNSSpecify(ob.Domain, ob.DNSIP)
 	case constant.ArgCheckNetwork:
 		err = CheckNetWork(ob.IP, ob.Timeout, ob.EdgeHubURL)
 	case constant.ArgCheckRuntime:
@@ -159,7 +163,7 @@ func CheckAll(ob *types.CheckOptions) error {
 		return err
 	}
 
-	err = CheckDNS(ob.Domain)
+	err = CheckDNSSpecify(ob.Domain, ob.DNSIP)
 	if err != nil {
 		return err
 	}
@@ -215,6 +219,21 @@ func CheckDNS(domain string) error {
 	return err
 }
 
+func CheckDNSSpecify(domain string, dns string) error {
+	if dns != "" {
+		net.DefaultResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: time.Millisecond * time.Duration(4000),
+				}
+				return d.DialContext(ctx, "udp", fmt.Sprintf("%s:53", dns))
+			},
+		}
+	}
+	return CheckDNS(domain)
+}
+
 func CheckNetWork(IP string, timeout int, edgeHubURL string) error {
 	if IP == "" && edgeHubURL == "" {
 		result, err := util.ExecShellFilter(constant.CmdGetDNSIP)
@@ -244,8 +263,9 @@ func CheckNetWork(IP string, timeout int, edgeHubURL string) error {
 }
 
 func CheckHTTP(url string) error {
+	cfg := &tls.Config{InsecureSkipVerify: false}
+	httpTransport := &http.Transport{TLSClientConfig: cfg}
 	// setup a http client
-	httpTransport := &http.Transport{}
 	httpClient := &http.Client{Transport: httpTransport, Timeout: time.Second * 3}
 	response, err := httpClient.Get(url)
 	if err != nil {

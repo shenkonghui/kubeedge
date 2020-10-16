@@ -43,6 +43,7 @@ type JoinOptions struct {
 
 type CheckOptions struct {
 	Domain     string
+	DNSIP      string
 	IP         string
 	Runtime    string
 	Timeout    int
@@ -74,7 +75,9 @@ type GettokenOptions struct {
 type DiagnoseOptions struct {
 	Pod          string
 	Namespace    string
+	Config       string
 	CheckOptions *CheckOptions
+	DBPath       string
 }
 
 type DiagnoseObject struct {

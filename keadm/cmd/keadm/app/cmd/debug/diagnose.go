@@ -9,9 +9,11 @@ import (
 	kubeedgeTypes "github.com/kubeedge/kubeedge/common/types"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	constant "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	types "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/util"
+	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 	edgecoreCfg "github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
@@ -64,10 +66,12 @@ func NewSubDiagnose(out io.Writer, object Diagnose) *cobra.Command {
 	}
 	switch object.Use {
 	case constant.ArgDiagnoseNode:
-		cmd.Flags().StringVarP(&do.CheckOptions.Runtime, "runtime", "r", do.CheckOptions.Runtime, "specify the runtime")
+		cmd.Flags().StringVarP(&do.Config, constant.EdgecoreConfig, "c", do.Config,
+			fmt.Sprintf("Specify configuration file, defalut is %s", common.EdgecoreConfigPath))
 	case constant.ArgDiagnosePod:
 		cmd.Flags().StringVarP(&do.Namespace, "namespace", "n", do.Namespace, "specify namespace")
 	case constant.ArgDiagnoseInstall:
+		cmd.Flags().StringVarP(&do.CheckOptions.DNSIP, "dns-ip", "D", do.CheckOptions.DNSIP, "specify test dns server ip")
 		cmd.Flags().StringVarP(&do.CheckOptions.Domain, "domain", "d", do.CheckOptions.Domain, "specify test domain")
 		cmd.Flags().StringVarP(&do.CheckOptions.IP, "ip", "i", do.CheckOptions.IP, "specify test ip")
 		cmd.Flags().StringVarP(&do.CheckOptions.EdgeHubURL, "edge-hub-url", "e", do.CheckOptions.EdgeHubURL, "specify edgehub url,")
@@ -80,6 +84,7 @@ func NewSubDiagnose(out io.Writer, object Diagnose) *cobra.Command {
 func NewDiagnoseOptins() *types.DiagnoseOptions {
 	do := &types.DiagnoseOptions{}
 	do.Namespace = "default"
+	do.Config = types.EdgecoreConfigPath
 	do.CheckOptions = &types.CheckOptions{
 		IP:      "",
 		Timeout: 1,
@@ -127,22 +132,55 @@ func DiagnoseNode(ops *types.DiagnoseOptions) error {
 	}
 	fmt.Println("edgecore is running")
 
-	// need filter current process
-	isDockerRuning, err := util.IsProcessRunningWithFilter(ops.CheckOptions.Runtime, "keadm")
+	isFileExists := util.FileExists(ops.Config)
+	if !isFileExists {
+		return fmt.Errorf("edge config is not exists")
+	}
+	fmt.Printf("edge config is exists: %v\n", ops.Config)
+
+	edgeconfig, err := util.ParseEdgecoreConfig(ops.Config)
 	if err != nil {
-		return fmt.Errorf("get runtime status fail")
+		return fmt.Errorf("parse Edgecore config failed")
 	}
 
-	if !isDockerRuning {
-		return fmt.Errorf("runtime is not running")
+	err = CheckRuntime(edgeconfig.Modules.Edged.RuntimeType)
+	if err != nil {
+		return err
 	}
-	fmt.Println("runtime is running")
+
+	// check datebase
+	dataSource := v1alpha1.DataBaseDataSource
+	if edgeconfig.DataBase.DataSource != "" {
+		dataSource = edgeconfig.DataBase.DataSource
+	}
+	ops.DBPath = dataSource
+	isFileExists = util.FileExists(dataSource)
+	if !isFileExists {
+		return fmt.Errorf("dataSource is not exists")
+	}
+	fmt.Printf("dataSource is exists: %v\n", dataSource)
+
+	//CheckNetWork
+	if !edgeconfig.Modules.EdgeHub.WebSocket.Enable {
+		return fmt.Errorf("edgehub is not enable")
+	}
+
+	cloudUrl := edgeconfig.Modules.EdgeHub.WebSocket.Server
+	err = CheckHTTP("https://" + cloudUrl)
+	if err != nil {
+		return fmt.Errorf("cloudcore websocket connection failed")
+	}
+	fmt.Printf("cloudcore websocket connection success")
 
 	return nil
 }
 
 func DiagnosePod(ops *types.DiagnoseOptions, podName string) error {
-	err := InitDB(edgecoreCfg.DataBaseDriverName, edgecoreCfg.DataBaseAliasName, edgecoreCfg.DataBaseDataSource)
+	ready := false
+	if ops.DBPath == "" {
+		ops.DBPath = edgecoreCfg.DataBaseDataSource
+	}
+	err := InitDB(edgecoreCfg.DataBaseDriverName, edgecoreCfg.DataBaseAliasName, ops.DBPath)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize database: %v ", err)
 	}
@@ -152,25 +190,46 @@ func DiagnosePod(ops *types.DiagnoseOptions, podName string) error {
 		return err
 	}
 
-	fmt.Printf("%v phase is %v \n", podName, podStatus.Phase)
+	fmt.Printf("pod %v phase is %v \n", podName, podStatus.Phase)
+	if podStatus.Phase != "Running" {
+		ready = false
+	}
 
 	conditions := podStatus.Conditions
 	containerConditions := podStatus.ContainerStatuses
 
 	// check conditions
 	for _, v := range conditions {
+		if v.Type == "Ready" && v.Status == "True" {
+			ready = true
+		}
 		if v.Status != "True" {
-			return fmt.Errorf("%v is not true", v.Type)
+			fmt.Printf("conditions is not true, type: %v ,message: %v ,reason: %v \n",
+				v.Type, v.Message, v.Reason)
 		}
 	}
 	// check containerConditions
 	for _, v := range containerConditions {
-		if *v.Started {
-			return fmt.Errorf("%v is not true", v.Name)
+		if !v.Ready {
+			if v.State.Waiting != nil {
+				fmt.Printf("containerConditions %v Waiting, message: %v, reason: %v, RestartCount: %v \n", v.Name,
+					v.State.Waiting.Message, v.State.Waiting.Reason, v.RestartCount)
+			} else if v.State.Terminated != nil {
+				fmt.Printf("containerConditions %v Terminated, message: %v, reason: %v, RestartCount: %v \n", v.Name,
+					v.State.Terminated.Message, v.State.Terminated.Reason, v.RestartCount)
+			} else {
+				fmt.Printf("containerConditions %v is not ready\n", v.Name)
+			}
+		} else {
+			fmt.Printf("containerConditions %v is ready\n", v.Name)
 		}
 	}
+	if ready {
+		fmt.Printf("Pod %s is Ready", podName)
+	} else {
+		return fmt.Errorf("Pod %s is not Ready", podName)
+	}
 
-	fmt.Printf("Pod %s is Ready", podName)
 	return nil
 }
 
@@ -199,11 +258,11 @@ func QueryPodFromDatabase(resNamePaces string, podName string) (*v1.PodStatus, e
 	conditionsPod := fmt.Sprintf("%v/pod/%v",
 		resNamePaces,
 		podName)
-	result, err := dao.QueryMeta("key", conditionsPod)
+	resultPod, err := dao.QueryMeta("key", conditionsPod)
 	if err != nil {
 		return nil, fmt.Errorf("read database fail: %s", err.Error())
 	}
-	if len(*result) == 0 {
+	if len(*resultPod) == 0 {
 		return nil, fmt.Errorf("not find %v in datebase", conditionsPod)
 	}
 	fmt.Printf("Pod %s is exist \n", podName)
@@ -211,16 +270,20 @@ func QueryPodFromDatabase(resNamePaces string, podName string) (*v1.PodStatus, e
 	conditionsStatus := fmt.Sprintf("%v/podstatus/%v",
 		resNamePaces,
 		podName)
-	result, err = dao.QueryMeta("key", conditionsStatus)
+	resultStatus, err := dao.QueryMeta("key", conditionsStatus)
 	if err != nil {
 		return nil, fmt.Errorf("read database fail: %s", err.Error())
 	}
-	if len(*result) == 0 {
-		return nil, fmt.Errorf("not find %v in datebase", conditionsStatus)
+	if len(*resultStatus) == 0 {
+		fmt.Printf("not find %v in datebase\n", conditionsStatus)
+		r := *resultPod
+		pod := &v1.Pod{}
+		json.Unmarshal([]byte(r[0]), pod)
+		return &pod.Status, nil
 	}
 	fmt.Printf("PodStatus %s is exist \n", podName)
 
-	r := *result
+	r := *resultStatus
 	podStatus := &kubeedgeTypes.PodStatusRequest{}
 	json.Unmarshal([]byte(r[0]), podStatus)
 	return &podStatus.Status, nil
@@ -248,7 +311,7 @@ func DiagnoseInstall(ob *types.CheckOptions) error {
 	}
 
 	if ob.Domain != "" {
-		err = CheckDNS(ob.Domain)
+		err = CheckDNSSpecify(ob.Domain, ob.DNSIP)
 		if err != nil {
 			return err
 		}
