@@ -831,6 +831,9 @@ func JSONYamlPrint(results []dao.Meta, printer printers.ResourcePrinter, out io.
 
 	if len(objectList) != 1 {
 		for _, info := range objectList {
+			if info == nil {
+				continue
+			}
 			o := info.DeepCopyObject()
 			list.Items = append(list.Items, runtime.RawExtension{Object: o})
 		}
@@ -861,7 +864,7 @@ func JSONYamlPrint(results []dao.Meta, printer printers.ResourcePrinter, out io.
 // Only used by JSONYamlPrint.
 func ParseMetaToV1List(results []dao.Meta) ([]runtime.Object, error) {
 	value := make(map[string]interface{})
-	list := make([]runtime.Object, 10)
+	list := make([]runtime.Object, 0)
 
 	for _, v := range results {
 
