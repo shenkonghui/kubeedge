@@ -986,6 +986,28 @@ func ParseMetaToV1List(results []dao.Meta) ([]runtime.Object, error) {
 			ep.APIVersion = "v1"
 			ep.Kind = v.Type
 			list = append(list, ep.DeepCopyObject())
+		case model.ResourceTypeNode:
+			node := v1.Node{}
+			status, err := json.Marshal(value["status"])
+			if err != nil {
+				return nil, err
+			}
+			spec, err := json.Marshal(value["spec"])
+			if err != nil {
+				return nil, err
+			}
+			if err := json.Unmarshal(metadata, &node.ObjectMeta); err != nil {
+				return nil, err
+			}
+			if err := json.Unmarshal(status, &node.Status); err != nil {
+				return nil, err
+			}
+			if err := json.Unmarshal(spec, &node.Spec); err != nil {
+				return nil, err
+			}
+			node.APIVersion = "v1"
+			node.Kind = v.Type
+			list = append(list, node.DeepCopyObject())
 		default:
 			return nil, fmt.Errorf("Parsing failed, unrecognized type: %v. ", v.Type)
 		}
