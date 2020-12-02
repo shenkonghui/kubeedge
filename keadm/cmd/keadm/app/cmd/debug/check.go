@@ -201,10 +201,12 @@ func CheckCPU() error {
 		return err
 	}
 
-	fmt.Printf("CPU total: %v core, Allowed > %v core\n", cpuNum, constant.AllowedValueCPU)
-	fmt.Printf("CPU usage rate: %.2f, Allowed rate < %v\n", percent[0]/100, constant.AllowedCurrentValueCPURate)
+	usage := util.Round(percent[0]/100, 3)
 
-	if cpuNum < constant.AllowedValueCPU || percent[0]/100 > constant.AllowedCurrentValueCPURate {
+	fmt.Printf("CPU total: %v core, Allowed > %v core\n", cpuNum, constant.AllowedValueCPU)
+	fmt.Printf("CPU usage rate: %.3f, Allowed rate < %v\n", usage, constant.AllowedCurrentValueCPURate)
+
+	if cpuNum < constant.AllowedValueCPU || usage > constant.AllowedCurrentValueCPURate {
 		return errors.New("cpu check failed")
 	}
 	return nil
@@ -216,14 +218,18 @@ func CheckMemory() error {
 		return err
 	}
 
-	fmt.Printf("Memory total: %.2f MB, Allowed > %v MB\n", float32(mem.Total)/constant.MB, constant.AllowedValueMemory/constant.MB)
-	fmt.Printf("Memory Free total: %.2f MB, Allowed > %v MB\n", float32(mem.Free)/constant.MB, constant.AllowedCurrentValueMem/constant.MB)
-	fmt.Printf("Memory usage rate: %.2f, Allowed rate < %v\n", mem.UsedPercent/100,
+	total := util.Round(float64(mem.Total)/constant.MB, 3)
+	free := util.Round(float64(mem.Free)/constant.MB, 3)
+	usage := util.Round(mem.UsedPercent/100, 5)
+
+	fmt.Printf("Memory total: %.3f MB, Allowed > %v MB\n", total, constant.AllowedValueMemory/constant.MB)
+	fmt.Printf("Memory Free total: %.3f MB, Allowed > %v MB\n", free, constant.AllowedCurrentValueMem/constant.MB)
+	fmt.Printf("Memory usage rate: %.5f, Allowed rate < %v\n", usage,
 		constant.AllowedCurrentValueMemRate)
 
-	if mem.Total < constant.AllowedValueMemory ||
-		mem.Free < constant.AllowedCurrentValueMem ||
-		mem.UsedPercent/100 > constant.AllowedCurrentValueMemRate {
+	if total < constant.AllowedValueMemory/constant.MB ||
+		free < constant.AllowedCurrentValueMem/constant.MB ||
+		usage > constant.AllowedCurrentValueMemRate {
 		return errors.New("memory check failed")
 	}
 
@@ -241,13 +247,17 @@ func CheckDisk() error {
 		return err
 	}
 
-	fmt.Printf("Disk total: %.2f MB, Allowed > %v MB\n", float32(diskInfo.Total)/constant.MB, constant.AllowedValueDisk/constant.MB)
-	fmt.Printf("Disk Free total: %.2f MB, Allowed > %vMB\n", float32(diskInfo.Free)/constant.MB, constant.AllowedCurrentValueDisk/constant.MB)
-	fmt.Printf("Disk usage rate: %.2f, Allowed rate < %v\n", diskInfo.UsedPercent/100, constant.AllowedCurrentValueDiskRate)
+	total := util.Round(float64(diskInfo.Total)/constant.MB, 3)
+	free := util.Round(float64(diskInfo.Free)/constant.MB, 3)
+	usage := util.Round(float64(diskInfo.UsedPercent/100), 5)
 
-	if diskInfo.Total < constant.AllowedValueDisk ||
-		diskInfo.Free < constant.AllowedCurrentValueDisk ||
-		diskInfo.UsedPercent/100 > constant.AllowedCurrentValueDiskRate {
+	fmt.Printf("Disk total: %.3f MB, Allowed > %v MB\n", total, constant.AllowedValueDisk/constant.MB)
+	fmt.Printf("Disk Free total: %.3f MB, Allowed > %vMB\n", free, constant.AllowedCurrentValueDisk/constant.MB)
+	fmt.Printf("Disk usage rate: %.5f, Allowed rate < %v\n", usage, constant.AllowedCurrentValueDiskRate)
+
+	if total < constant.AllowedValueDisk/constant.MB ||
+		free < constant.AllowedCurrentValueDisk/constant.MB ||
+		usage > constant.AllowedCurrentValueDiskRate {
 		return errors.New("disk check failed")
 	}
 
